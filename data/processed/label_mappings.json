@@ -1,0 +1,44 @@
+{
+  "project_type": {
+    "0": "Airport Expansion",
+    "1": "Dam / Reservoir",
+    "2": "Expressway",
+    "3": "Housing Scheme",
+    "4": "Industrial Corridor",
+    "5": "Irrigation Canal",
+    "6": "Metro Rail",
+    "7": "National Highway",
+    "8": "Port Development",
+    "9": "Power Plant",
+    "10": "Railway Line",
+    "11": "Smart City",
+    "12": "Solar Park",
+    "13": "State Highway",
+    "14": "Transmission Line"
+  },
+  "state": {
+    "0": "Andhra Pradesh",
+    "1": "Bihar",
+    "2": "Gujarat",
+    "3": "Haryana",
+    "4": "Jharkhand",
+    "5": "Karnataka",
+    "6": "Madhya Pradesh",
+    "7": "Maharashtra",
+    "8": "Odisha",
+    "9": "Punjab",
+    "10": "Rajasthan",
+    "11": "Tamil Nadu",
+    "12": "Telangana",
+    "13": "Uttar Pradesh",
+    "14": "West Bengal"
+  },
+  "acquisition_stages": {
+    "0": "Section 11 Notification",
+    "1": "Section 19 Declaration",
+    "2": "Award Passed",
+    "3": "Compensation Disbursed",
+    "4": "Possession Taken",
+    "5": "R&R Completed"
+  }
+}
