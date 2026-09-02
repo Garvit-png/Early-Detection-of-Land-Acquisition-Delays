@@ -53,6 +53,8 @@ class User(Base):
 
     audit_logs    = relationship("AuditLog", back_populates="user")
     alerts        = relationship("Alert", back_populates="assigned_to_user")
+    actions_assigned = relationship("ActionItem", foreign_keys="ActionItem.assigned_to", back_populates="assignee")
+    actions_created  = relationship("ActionItem", foreign_keys="ActionItem.assigned_by",  back_populates="assigner")
 
 
 # ─── Projects ────────────────────────────────────────────────────────────────────
@@ -79,6 +81,11 @@ class Project(Base):
     pending_notifications         = Column(Integer)
     has_legal_dispute             = Column(Boolean, default=False)
     num_legal_cases               = Column(Integer, default=0)
+    ownership_conflicts           = Column(Integer, default=0)   # R-03
+    documentation_pct             = Column(Float, nullable=True) # R-04
+    stakeholder_response_pct      = Column(Float, nullable=True) # R-05
+    days_since_update             = Column(Integer, default=0)   # R-08
+    award_overdue                 = Column(Boolean, default=False) # R-06
     compensation_pct              = Column(Float)
     compensation_pending_months   = Column(Integer)
     rr_completion_pct             = Column(Float)
@@ -101,6 +108,10 @@ class Project(Base):
     top_delay_reasons             = Column(JSON, nullable=True)
     shap_factors                  = Column(JSON, nullable=True)
     recommendations               = Column(JSON, nullable=True)
+    rules_triggered               = Column(JSON, nullable=True)  # e.g. ["R-01","R-03"]
+    expected_delay_days           = Column(Integer, nullable=True)
+    expected_delay_label          = Column(String(128), nullable=True)
+    model_confidence              = Column(String(64), nullable=True)
     last_scored_at                = Column(DateTime, nullable=True)
 
     is_delayed                    = Column(Boolean, default=False)
@@ -109,6 +120,8 @@ class Project(Base):
                                            onupdate=lambda: datetime.now(timezone.utc))
 
     alerts                        = relationship("Alert", back_populates="project")
+    risk_history                  = relationship("RiskHistory", back_populates="project", order_by="RiskHistory.scored_at")
+    action_items                  = relationship("ActionItem", back_populates="project")
 
 
 # ─── Alerts ──────────────────────────────────────────────────────────────────────
@@ -147,3 +160,66 @@ class AuditLog(Base):
     created_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     user        = relationship("User", back_populates="audit_logs")
+
+
+# ─── Risk History ─────────────────────────────────────────────────────────────
+# Every time a project is scored/re-scored, one row is appended here.
+# This gives us the time-series needed for the "Risk History" chart in the flow.
+
+class RiskHistory(Base):
+    __tablename__ = "risk_history"
+
+    id               = Column(Integer, primary_key=True, index=True)
+    project_id_fk    = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    risk_score       = Column(Float, nullable=False)
+    delay_probability = Column(Float, nullable=False)
+    risk_category    = Column(SAEnum(RiskCategory), nullable=False)
+    rules_triggered  = Column(JSON, nullable=True)
+    scored_by        = Column(Integer, ForeignKey("users.id"), nullable=True)   # null = system
+    trigger          = Column(String(32), default="manual")                     # manual | update | batch | submit
+    notes            = Column(Text, nullable=True)
+    scored_at        = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+
+    project          = relationship("Project", back_populates="risk_history")
+    scorer           = relationship("User", foreign_keys=[scored_by])
+
+
+# ─── Action Items ─────────────────────────────────────────────────────────────
+# Officer review → Accept/Modify/Override → Assign Action → Action Tracking
+
+class ActionStatus(str, enum.Enum):
+    OPEN       = "open"
+    IN_PROGRESS = "in_progress"
+    COMPLETED  = "completed"
+    OVERRIDDEN = "overridden"
+
+
+class ActionItem(Base):
+    __tablename__ = "action_items"
+
+    id             = Column(Integer, primary_key=True, index=True)
+    project_id_fk  = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    # Which rule/recommendation triggered this
+    rule_id        = Column(String(8), nullable=True)    # e.g. "R-01"
+    title          = Column(String(256), nullable=False)
+    description    = Column(Text, nullable=True)
+    # Officer review outcome
+    officer_decision = Column(String(16), default="accept")   # accept | modify | override
+    override_note  = Column(Text, nullable=True)              # reason if overridden
+    # Assignment
+    assigned_to    = Column(Integer, ForeignKey("users.id"), nullable=True)
+    assigned_by    = Column(Integer, ForeignKey("users.id"), nullable=True)
+    # Status tracking
+    status         = Column(SAEnum(ActionStatus), default=ActionStatus.OPEN, index=True)
+    priority       = Column(String(8), default="medium")      # low | medium | high | critical
+    due_date       = Column(DateTime, nullable=True)
+    completed_at   = Column(DateTime, nullable=True)
+    completion_note = Column(Text, nullable=True)
+    # Timestamps
+    created_at     = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at     = Column(DateTime, default=lambda: datetime.now(timezone.utc),
+                            onupdate=lambda: datetime.now(timezone.utc))
+
+    project        = relationship("Project", back_populates="action_items")
+    assignee       = relationship("User", foreign_keys=[assigned_to])
+    assigner       = relationship("User", foreign_keys=[assigned_by])

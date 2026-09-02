@@ -119,3 +119,70 @@ def get_stats(current_user: CurrentUser, db: Session = Depends(get_db)):
         by_stage=by_stage,
         recent_high_risk=recent_high_risk,
     )
+
+
+@router.get("/state-analytics")
+def get_state_analytics(current_user: CurrentUser, db: Session = Depends(get_db)):
+    """
+    Per-state aggregated metrics for the State Comparison page.
+    Returns one row per state with risk breakdown, avg compensation, R&R, rules breakdown.
+    """
+    query = db.query(Project)
+    if current_user.role == UserRole.STATE:
+        query = query.filter(Project.state == current_user.state)
+    elif current_user.role == UserRole.DISTRICT:
+        query = query.filter(Project.state == current_user.state, Project.district == current_user.district)
+
+    projects = query.all()
+
+    state_map: dict[str, dict] = {}
+    for p in projects:
+        s = p.state
+        if s not in state_map:
+            state_map[s] = {
+                "state": s,
+                "total": 0, "high": 0, "medium": 0, "low": 0, "unscored": 0,
+                "delayed": 0,
+                "_risk_scores": [], "_comp": [], "_rr": [], "_doc": [], "_shr": [],
+                "_rules": {"R-01": 0, "R-02": 0, "R-03": 0, "R-04": 0,
+                           "R-05": 0, "R-06": 0, "R-07": 0, "R-08": 0},
+            }
+        d = state_map[s]
+        d["total"] += 1
+        if p.risk_category and p.risk_category.value == "High":   d["high"] += 1
+        elif p.risk_category and p.risk_category.value == "Medium": d["medium"] += 1
+        elif p.risk_category and p.risk_category.value == "Low":    d["low"] += 1
+        else:                                                        d["unscored"] += 1
+        if p.is_delayed:  d["delayed"] += 1
+        if p.risk_score is not None: d["_risk_scores"].append(p.risk_score)
+        if p.compensation_pct is not None: d["_comp"].append(p.compensation_pct)
+        if p.rr_completion_pct is not None: d["_rr"].append(p.rr_completion_pct)
+        if getattr(p, "documentation_pct", None) is not None: d["_doc"].append(p.documentation_pct)
+        if getattr(p, "stakeholder_response_pct", None) is not None: d["_shr"].append(p.stakeholder_response_pct)
+        # Count rule hits
+        rules = p.rules_triggered or []
+        for r in rules:
+            if r in d["_rules"]:
+                d["_rules"][r] += 1
+
+    result = []
+    for s, d in state_map.items():
+        avg = lambda lst: round(sum(lst) / len(lst), 1) if lst else 0
+        result.append({
+            "state":          s,
+            "total":          d["total"],
+            "high":           d["high"],
+            "medium":         d["medium"],
+            "low":            d["low"],
+            "delayed":        d["delayed"],
+            "delay_rate":     round(d["delayed"] / d["total"] * 100, 1) if d["total"] else 0,
+            "avg_risk_score": avg(d["_risk_scores"]),
+            "avg_compensation_pct": avg(d["_comp"]),
+            "avg_rr_pct":     avg(d["_rr"]),
+            "avg_doc_pct":    avg(d["_doc"]),
+            "avg_stakeholder_pct": avg(d["_shr"]),
+            "rule_hits":      d["_rules"],
+        })
+
+    result.sort(key=lambda x: x["avg_risk_score"], reverse=True)
+    return result

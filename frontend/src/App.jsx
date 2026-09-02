@@ -5,9 +5,11 @@ import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import ProjectsPage from './pages/ProjectsPage'
 import ProjectDetailPage from './pages/ProjectDetailPage'
+import SubmitProjectPage from './pages/SubmitProjectPage'
 import MapPage from './pages/MapPage'
 import AlertsPage from './pages/AlertsPage'
 import AuditPage from './pages/AuditPage'
+import AnalyticsPage from './pages/AnalyticsPage'
 
 function RequireAuth({ children }) {
   const token = localStorage.getItem('token')
@@ -26,9 +28,11 @@ export default function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard"          element={<DashboardPage />} />
             <Route path="projects"           element={<ProjectsPage />} />
+            <Route path="projects/new"       element={<SubmitProjectPage />} />
             <Route path="projects/:id"       element={<ProjectDetailPage />} />
             <Route path="map"                element={<MapPage />} />
             <Route path="alerts"             element={<AlertsPage />} />
+            <Route path="analytics"          element={<AnalyticsPage />} />
             <Route path="audit"              element={<AuditPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

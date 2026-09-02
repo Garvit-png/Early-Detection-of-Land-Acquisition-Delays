@@ -6,9 +6,33 @@ import {
 } from 'recharts'
 import { getDashboardStats, batchScore } from '../services/api'
 import { useAuth } from '../store/authStore'
+import { Icon } from '../components/shared/Icons'
+import ModelStatusCard from '../components/dashboard/ModelStatusCard'
 
-const COLORS = { High: '#dc2626', Medium: '#d97706', Low: '#16a34a' }
-const PIE_COLORS = ['#dc2626', '#d97706', '#16a34a', '#94a3b8']
+const PIE_COLORS = ['#c0392b', '#b7770d', '#1a6b3a', '#9aa0ae']
+
+function StatCard({ label, value, sub, variant = 'default', icon: IconComp }) {
+  return (
+    <div className={`kpi-card ${variant}`}>
+      {IconComp && (
+        <div className="kpi-icon">
+          <IconComp />
+        </div>
+      )}
+      <div className="kpi-label">{label}</div>
+      <div className="kpi-value">{typeof value === 'number' ? value.toLocaleString() : value}</div>
+      {sub && <div className="kpi-sub">{sub}</div>}
+    </div>
+  )
+}
+
+const TOOLTIP_STYLE = {
+  background: '#fff',
+  border: '1px solid #dde0e6',
+  borderRadius: 6,
+  fontSize: 12,
+  boxShadow: '0 2px 8px rgba(0,0,0,.08)',
+}
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -27,9 +51,9 @@ export default function DashboardPage() {
     setScoring(true)
     try {
       const r = await batchScore()
-      alert(`Scored ${r.data.scored} projects!`)
       const r2 = await getDashboardStats()
       setStats(r2.data)
+      alert(`${r.data.scored} projects scored successfully.`)
     } catch (e) {
       alert('Error: ' + (e.response?.data?.detail || e.message))
     } finally {
@@ -37,8 +61,8 @@ export default function DashboardPage() {
     }
   }
 
-  if (loading) return <div className="spinner" />
-  if (!stats) return <div className="empty-state">Failed to load stats.</div>
+  if (loading) return <div className="spinner-wrap"><div className="spinner" /></div>
+  if (!stats) return <div className="empty-state"><div className="empty-state-text">Failed to load dashboard data.</div></div>
 
   const pieData = [
     { name: 'High Risk',   value: stats.high_risk },
@@ -49,152 +73,144 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h1 className="page-title" style={{ margin: 0 }}>Dashboard Overview</h1>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Overview</h1>
+          <div className="page-subtitle">Summary of all land acquisition projects and risk indicators</div>
+        </div>
         {(user?.role === 'central' || user?.role === 'state') && (
           <button className="btn btn-primary" onClick={handleBatchScore} disabled={scoring}>
-            {scoring ? 'Scoring…' : '⚡ Batch Score Projects'}
+            <Icon.Lightning />
+            {scoring ? 'Scoring in progress…' : 'Run Batch Score'}
           </button>
         )}
       </div>
 
-      {/* KPI Cards */}
-      <div className="stat-grid">
-        <div className="stat-card">
-          <div className="stat-label">Total Projects</div>
-          <div className="stat-value">{stats.total_projects.toLocaleString()}</div>
-        </div>
-        <div className="stat-card danger">
-          <div className="stat-label">High Risk</div>
-          <div className="stat-value">{stats.high_risk.toLocaleString()}</div>
-          <div className="stat-sub">Immediate attention needed</div>
-        </div>
-        <div className="stat-card warning">
-          <div className="stat-label">Medium Risk</div>
-          <div className="stat-value">{stats.medium_risk.toLocaleString()}</div>
-        </div>
-        <div className="stat-card success">
-          <div className="stat-label">Low Risk</div>
-          <div className="stat-value">{stats.low_risk.toLocaleString()}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Avg Risk Score</div>
-          <div className="stat-value">{stats.avg_risk_score}</div>
-          <div className="stat-sub">out of 100</div>
-        </div>
-        <div className="stat-card warning">
-          <div className="stat-label">Legal Disputes</div>
-          <div className="stat-value">{stats.projects_with_legal_dispute.toLocaleString()}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Avg Compensation</div>
-          <div className="stat-value">{stats.avg_compensation_pct}%</div>
-          <div className="stat-sub">disbursed</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Avg R&R</div>
-          <div className="stat-value">{stats.avg_rr_completion_pct}%</div>
-          <div className="stat-sub">completed</div>
-        </div>
+      {/* KPI Row */}
+      <div className="kpi-grid">
+        <StatCard label="Total Projects"    value={stats.total_projects}               icon={Icon.Projects} />
+        <StatCard label="High Risk"         value={stats.high_risk}    variant="danger"
+          sub="Require immediate attention"  icon={Icon.AlertTriangle} />
+        <StatCard label="Medium Risk"       value={stats.medium_risk}  variant="warning" icon={Icon.TrendUp} />
+        <StatCard label="Low Risk"          value={stats.low_risk}     variant="success" icon={Icon.Check} />
+        <StatCard label="Avg Risk Score"    value={stats.avg_risk_score} sub="out of 100" />
+        <StatCard label="Legal Disputes"    value={stats.projects_with_legal_dispute} variant="warning" icon={Icon.Scale} />
+        <StatCard label="Avg Compensation"  value={`${stats.avg_compensation_pct}%`}  sub="disbursed" icon={Icon.Wallet} />
+        <StatCard label="Avg R&R"           value={`${stats.avg_rr_completion_pct}%`} sub="completed" />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
-        {/* Risk Distribution Pie */}
+      <div className="grid-2" style={{ marginBottom: 24 }}>
+        {/* Risk Distribution */}
         <div className="card">
-          <div className="card-title">Risk Distribution</div>
-          <ResponsiveContainer width="100%" height={240}>
+          <div className="card-header">
+            <div className="card-title">Risk Distribution</div>
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}>
+              <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                outerRadius={80} innerRadius={40}
+                label={({ name, percent }) => percent > 0.04 ? `${(percent*100).toFixed(0)}%` : ''}>
                 {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i]} />)}
               </Pie>
-              <Legend />
-              <Tooltip />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
+              <Tooltip contentStyle={TOOLTIP_STYLE} />
             </PieChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Top States by High Risk */}
+        {/* High Risk by State */}
         <div className="card">
-          <div className="card-title">High Risk by State (Top 8)</div>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={stats.by_state.slice(0, 8)} layout="vertical" margin={{ left: 80 }}>
-              <XAxis type="number" tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="state" tick={{ fontSize: 11 }} width={80} />
-              <Tooltip />
-              <Bar dataKey="high" fill="#dc2626" name="High Risk" radius={[0, 3, 3, 0]} />
-              <Bar dataKey="medium" fill="#d97706" name="Medium Risk" radius={[0, 3, 3, 0]} />
+          <div className="card-header">
+            <div className="card-title">High Risk Projects by State</div>
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={stats.by_state.slice(0, 8)} layout="vertical" margin={{ left: 80, right: 16 }}>
+              <XAxis type="number" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="state" tick={{ fontSize: 11 }} width={80} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={TOOLTIP_STYLE} />
+              <Bar dataKey="high" fill="#c0392b" name="High" radius={[0, 3, 3, 0]} maxBarSize={12} />
+              <Bar dataKey="medium" fill="#b7770d" name="Medium" radius={[0, 3, 3, 0]} maxBarSize={12} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+      <div className="grid-2" style={{ marginBottom: 24 }}>
         {/* Avg Risk by Project Type */}
         <div className="card">
-          <div className="card-title">Avg Risk Score by Project Type</div>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={stats.by_project_type} layout="vertical" margin={{ left: 100 }}>
-              <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="project_type" tick={{ fontSize: 10 }} width={100} />
-              <Tooltip />
-              <Bar dataKey="avg_risk" name="Avg Risk Score" radius={[0, 3, 3, 0]}
-                fill="#3b82f6"
-                label={{ position: 'right', fontSize: 10 }}
-              />
+          <div className="card-header">
+            <div className="card-title">Average Risk Score by Project Type</div>
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={stats.by_project_type} layout="vertical" margin={{ left: 110, right: 16 }}>
+              <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="project_type" tick={{ fontSize: 10 }} width={110} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [`${v}`, 'Avg Risk Score']} />
+              <Bar dataKey="avg_risk" fill="#1a3c6e" name="Avg Risk" radius={[0, 3, 3, 0]} maxBarSize={10} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Projects by Stage */}
+        {/* By Stage */}
         <div className="card">
-          <div className="card-title">Projects by Acquisition Stage</div>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={stats.by_stage} margin={{ left: 10 }}>
-              <XAxis dataKey="stage" tick={{ fontSize: 9 }} angle={-20} textAnchor="end" height={50} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Bar dataKey="count" fill="#6366f1" radius={[3, 3, 0, 0]} />
+          <div className="card-header">
+            <div className="card-title">Projects by Acquisition Stage</div>
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={stats.by_stage} margin={{ left: 8, right: 8, bottom: 40 }}>
+              <XAxis dataKey="stage" tick={{ fontSize: 9 }} angle={-20} textAnchor="end" interval={0} height={60} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={TOOLTIP_STYLE} />
+              <Bar dataKey="count" fill="#1a3c6e" radius={[3, 3, 0, 0]} maxBarSize={36} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Recent High Risk Table */}
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div className="card-title" style={{ margin: 0 }}>Top High-Risk Projects</div>
-          <button className="btn btn-outline btn-sm" onClick={() => navigate('/projects?risk_category=High')}>
-            View All →
-          </button>
-        </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Project ID</th><th>Name</th><th>State</th><th>District</th><th>Risk Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stats.recent_high_risk.map(p => (
-                <tr key={p.project_id} style={{ cursor: 'pointer' }}
-                  onClick={() => navigate(`/projects/${p.project_id}`)}>
-                  <td><code style={{ fontSize: 12 }}>{p.project_id}</code></td>
-                  <td>{p.project_name}</td>
-                  <td>{p.state}</td>
-                  <td>{p.district}</td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div className="risk-bar-wrap" style={{ width: 60 }}>
-                        <div className="risk-bar High" style={{ width: `${p.risk_score}%` }} />
-                      </div>
-                      <span style={{ fontWeight: 600, color: 'var(--danger)' }}>{p.risk_score}</span>
-                    </div>
-                  </td>
+      {/* Bottom row: High-Risk table + Model Status card */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }}>
+        <div className="table-container">
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--gray-100)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="card-title">Top High-Risk Projects</div>
+            <button className="btn btn-outline btn-sm"
+              onClick={() => navigate('/projects?risk_category=High')}>
+              View All
+            </button>
+          </div>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Project ID</th>
+                  <th>Project Name</th>
+                  <th>State</th>
+                  <th>District</th>
+                  <th>Risk Score</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {stats.recent_high_risk.map(p => (
+                  <tr key={p.project_id} onClick={() => navigate(`/projects/${p.project_id}`)}>
+                    <td><span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{p.project_id}</span></td>
+                    <td style={{ fontWeight: 500 }}>{p.project_name}</td>
+                    <td>{p.state}</td>
+                    <td>{p.district}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div className="progress-wrap" style={{ width: 80 }}>
+                          <div className="progress-bar danger" style={{ width: `${p.risk_score}%` }} />
+                        </div>
+                        <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--danger)' }}>{p.risk_score}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
+
+        <ModelStatusCard />
       </div>
     </>
   )

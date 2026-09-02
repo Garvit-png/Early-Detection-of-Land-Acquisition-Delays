@@ -1,15 +1,25 @@
 import { useEffect, useState } from 'react'
+import { Navigate } from 'react-router-dom'
 import { getAuditLogs } from '../services/api'
 import { useAuth } from '../store/authStore'
-import { Navigate } from 'react-router-dom'
+
+const ACTION_STYLES = {
+  LOGIN:        { background: '#d1fae5', color: '#065f46' },
+  VIEW_PROJECT: { background: '#dbeafe', color: '#1e3a8a' },
+  LIST_PROJECTS:{ background: '#ede9fe', color: '#3730a3' },
+  SCORE_PROJECT:{ background: '#fef3c7', color: '#78350f' },
+  BATCH_SCORE:  { background: '#ffedd5', color: '#7c2d12' },
+  UPDATE_ALERT: { background: '#fce7f3', color: '#831843' },
+  IMPORT_CSV:   { background: '#cffafe', color: '#164e63' },
+}
 
 export default function AuditPage() {
   const { user } = useAuth()
+  if (user?.role !== 'central') return <Navigate to="/dashboard" replace />
+
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
-
-  if (user?.role !== 'central') return <Navigate to="/dashboard" replace />
 
   useEffect(() => {
     setLoading(true)
@@ -18,62 +28,82 @@ export default function AuditPage() {
       .finally(() => setLoading(false))
   }, [page])
 
-  const ACTION_COLORS = {
-    LOGIN: '#16a34a', LOGOUT: '#64748b',
-    VIEW_PROJECT: '#3b82f6', LIST_PROJECTS: '#6366f1',
-    SCORE_PROJECT: '#d97706', BATCH_SCORE: '#ea580c',
-    UPDATE_ALERT: '#8b5cf6', IMPORT_CSV: '#0891b2',
-  }
-
   return (
     <>
-      <h1 className="page-title">Audit Logs</h1>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Audit Logs</h1>
+          <div className="page-subtitle">
+            Full record of all user actions in the system. Visible to Central users only.
+          </div>
+        </div>
+      </div>
 
       {loading
-        ? <div className="spinner" />
+        ? <div className="spinner-wrap"><div className="spinner" /></div>
         : (
-          <div className="card" style={{ padding: 0 }}>
-            <div className="table-wrap">
+          <div className="table-container">
+            <div className="table-scroll">
               <table>
                 <thead>
                   <tr>
-                    <th>#</th><th>Time</th><th>User</th><th>Action</th>
-                    <th>Resource</th><th>Detail</th><th>IP</th>
+                    <th>#</th>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Resource</th>
+                    <th>Detail</th>
+                    <th>IP Address</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data?.items?.map(log => (
-                    <tr key={log.id}>
-                      <td style={{ color: 'var(--gray-400)', fontSize: 11 }}>{log.id}</td>
-                      <td style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
-                        {new Date(log.created_at).toLocaleString()}
-                      </td>
-                      <td style={{ fontWeight: 500 }}>{log.username}</td>
-                      <td>
-                        <span style={{
-                          background: ACTION_COLORS[log.action] || '#94a3b8',
-                          color: '#fff', padding: '2px 7px', borderRadius: 4, fontSize: 11, fontWeight: 600
+                  {data?.items?.map(log => {
+                    const style = ACTION_STYLES[log.action] || { background: 'var(--gray-100)', color: 'var(--gray-600)' }
+                    return (
+                      <tr key={log.id} style={{ cursor: 'default' }}>
+                        <td style={{ color: 'var(--gray-400)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                          {log.id}
+                        </td>
+                        <td style={{ fontSize: 11, color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>
+                          {new Date(log.created_at).toLocaleString('en-IN', {
+                            day: '2-digit', month: 'short', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit',
+                          })}
+                        </td>
+                        <td style={{ fontWeight: 600, fontSize: 13 }}>{log.username}</td>
+                        <td>
+                          <span className="action-tag" style={style}>
+                            {log.action}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: 12, color: 'var(--gray-600)' }}>
+                          {log.resource}
+                          {log.resource_id ? <span style={{ color: 'var(--gray-400)' }}> #{log.resource_id}</span> : ''}
+                        </td>
+                        <td style={{
+                          fontSize: 11, color: 'var(--gray-500)',
+                          maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                         }}>
-                          {log.action}
-                        </span>
-                      </td>
-                      <td style={{ fontSize: 12 }}>{log.resource}{log.resource_id ? ` #${log.resource_id}` : ''}</td>
-                      <td style={{ fontSize: 11, color: 'var(--gray-600)', maxWidth: 300,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {log.detail}
-                      </td>
-                      <td style={{ fontSize: 11, color: 'var(--gray-400)' }}>{log.ip_address}</td>
-                    </tr>
-                  ))}
+                          {log.detail}
+                        </td>
+                        <td style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--gray-400)' }}>
+                          {log.ip_address}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
-            <div className="pagination" style={{ padding: '12px 20px' }}>
-              <button className="page-btn" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
-              <span style={{ fontSize: 12, color: 'var(--gray-500)' }}>
-                Page {page} of {data?.total_pages}
+
+            <div className="pagination">
+              <span className="pagination-info">
+                Page {page} of {data?.total_pages ?? 1}
               </span>
-              <button className="page-btn" disabled={page >= data?.total_pages} onClick={() => setPage(p => p + 1)}>Next →</button>
+              <div className="pagination-btns">
+                <button className="pager-btn" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</button>
+                <button className="pager-btn" disabled={page >= (data?.total_pages ?? 1)} onClick={() => setPage(p => p + 1)}>Next</button>
+              </div>
             </div>
           </div>
         )
