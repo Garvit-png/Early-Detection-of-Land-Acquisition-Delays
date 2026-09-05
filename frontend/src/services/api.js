@@ -70,3 +70,6 @@ export const createAction      = (projectId, data) => api.post(`/actions/project
 export const assignAction      = (id, userId)      => api.patch(`/actions/${id}/assign?assigned_to=${userId}`, {})
 export const updateAction      = (id, data)        => api.patch(`/actions/${id}`, data)
 export const getActionCounts   = ()                => api.get('/actions/counts/summary')
+
+// ─── AI Explanation (OpenAI + RAG) ────────────────────────────────────────────
+export const getExplanation = (projectId) => api.post(`/explain/${projectId}`)

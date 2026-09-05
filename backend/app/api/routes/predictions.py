@@ -57,6 +57,9 @@ def _project_to_features(p: Project) -> dict:
         "district_historical_delay_rate": p.district_historical_delay_rate or 0.5,
         "prev_delayed_district":          p.prev_delayed_district or 0,
         "officer_responsiveness":         p.officer_responsiveness or 5,
+        "funding_readiness":              getattr(p, "funding_readiness",       None) or 75,
+        "notice_delivery_pct":            getattr(p, "notice_delivery_pct",     None) or 75,
+        "mutation_completion_pct":        getattr(p, "mutation_completion_pct", None) or 0,
         "project_type_code":              p.project_type_code or 0,
         "state_code":                     p.state_code or 0,
     }

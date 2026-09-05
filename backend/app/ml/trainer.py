@@ -23,7 +23,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "../../.."))
 MODELS_DIR   = os.path.join(PROJECT_ROOT, "data/models")
 CSV_FALLBACK = os.path.join(PROJECT_ROOT, "data/processed/projects_ml.csv")
 
-# ── 26 features — all 8 CSV rules covered ────────────────────────────────────────
+# ── 31 features — all 8 CSV rules + FM-12/13/14 covered ─────────────────────────
 FEATURE_COLS = [
     # Scale
     "land_area_ha", "families_affected",
@@ -51,6 +51,12 @@ FEATURE_COLS = [
     "district_historical_delay_rate", "prev_delayed_district",
     # Governance (R-08)
     "officer_responsiveness",
+    # FM-12: Funding readiness (CAG-03 / ADMIN-03)
+    "funding_readiness",
+    # FM-13: Notice delivery (CAG-04 / ADMIN-04)
+    "notice_delivery_pct",
+    # FM-14: Mutation completion (CAG-13 / ADMIN-09)
+    "mutation_completion_pct",
     # Encodings
     "project_type_code", "state_code",
 ]
@@ -82,6 +88,9 @@ FEATURE_DISPLAY_NAMES = {
     "district_historical_delay_rate": "District Historical Delay Rate",
     "prev_delayed_district":          "Prev Delayed Projects in District",
     "officer_responsiveness":         "Officer Responsiveness Score (R-08)",
+    "funding_readiness":              "Funding Readiness % (FM-12 / CAG-03)",
+    "notice_delivery_pct":            "Notice Delivery % (FM-13 / CAG-04)",
+    "mutation_completion_pct":        "Mutation Completion % (FM-14 / CAG-13)",
     "project_type_code":              "Project Type",
     "state_code":                     "State",
 }
@@ -144,6 +153,9 @@ def _load_training_data(db=None) -> pd.DataFrame:
                         "district_historical_delay_rate": p.district_historical_delay_rate or 0.5,
                         "prev_delayed_district":          p.prev_delayed_district or 0,
                         "officer_responsiveness":         p.officer_responsiveness or 5,
+                        "funding_readiness":              getattr(p, "funding_readiness",       None) or 75,
+                        "notice_delivery_pct":            getattr(p, "notice_delivery_pct",     None) or 75,
+                        "mutation_completion_pct":        getattr(p, "mutation_completion_pct", None) or 0,
                         "project_type_code":              p.project_type_code or 0,
                         "state_code":                     p.state_code or 0,
                         "is_delayed":                     int(p.is_delayed),

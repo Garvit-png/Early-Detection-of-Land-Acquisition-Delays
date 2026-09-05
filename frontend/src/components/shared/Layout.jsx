@@ -1,15 +1,16 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/authStore'
 import { useEffect, useState } from 'react'
-import { getUnreadCount } from '../../services/api'
+import { getUnreadCount, getActionCounts } from '../../services/api'
 import { Icon } from './Icons'
 
 const NAV = [
-  { to: '/dashboard', label: 'Dashboard',  Icon: Icon.Dashboard },
-  { to: '/projects',  label: 'Projects',   Icon: Icon.Projects  },
-  { to: '/map',       label: 'GIS Map',    Icon: Icon.Map       },
-  { to: '/analytics', label: 'Analytics',  Icon: Icon.TrendUp   },
-  { to: '/alerts',    label: 'Alerts',     Icon: Icon.Bell, showBadge: true },
+  { to: '/dashboard', label: 'Dashboard',       Icon: Icon.Dashboard },
+  { to: '/projects',  label: 'Projects',        Icon: Icon.Projects  },
+  { to: '/map',       label: 'GIS Map',         Icon: Icon.Map       },
+  { to: '/analytics', label: 'Analytics',       Icon: Icon.TrendUp   },
+  { to: '/actions',   label: 'Action Tracking', Icon: Icon.Audit, showActionBadge: true },
+  { to: '/alerts',    label: 'Alerts',          Icon: Icon.Bell, showBadge: true },
 ]
 const ADMIN_NAV = [
   { to: '/audit', label: 'Audit Logs', Icon: Icon.Audit },
@@ -24,13 +25,16 @@ const ROLE_LABELS = {
 export default function Layout() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
-  const [unread, setUnread] = useState(0)
+  const [unread, setUnread]         = useState(0)
+  const [openActions, setOpenActions] = useState(0)
 
   useEffect(() => {
     getUnreadCount().then(r => setUnread(r.data.count)).catch(() => {})
-    const id = setInterval(() =>
-      getUnreadCount().then(r => setUnread(r.data.count)).catch(() => {}),
-    30000)
+    getActionCounts().then(r => setOpenActions((r.data.open || 0) + (r.data.in_progress || 0))).catch(() => {})
+    const id = setInterval(() => {
+      getUnreadCount().then(r => setUnread(r.data.count)).catch(() => {})
+      getActionCounts().then(r => setOpenActions((r.data.open || 0) + (r.data.in_progress || 0))).catch(() => {})
+    }, 30000)
     return () => clearInterval(id)
   }, [])
 
@@ -57,13 +61,16 @@ export default function Layout() {
         {/* Navigation */}
         <div className="sidebar-nav">
           <div className="sidebar-divider">Navigation</div>
-          {NAV.map(({ to, label, Icon: NavIcon, showBadge }) => (
+          {NAV.map(({ to, label, Icon: NavIcon, showBadge, showActionBadge }) => (
             <NavLink key={to} to={to}
               className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
               <NavIcon />
               <span>{label}</span>
               {showBadge && unread > 0 && (
                 <span className="nav-badge">{unread}</span>
+              )}
+              {showActionBadge && openActions > 0 && (
+                <span className="nav-badge" style={{ background: 'var(--warning)' }}>{openActions}</span>
               )}
             </NavLink>
           ))}

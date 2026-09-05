@@ -1,0 +1,14 @@
+# SIH Recommendation Rules
+
+Prototype rule base connecting detected risk factors to actionable recommendations. These are prototype decision rules, not legal advice.
+
+| Rule_ID | Risk_Type | Condition | Prototype_Recommendation | Note |
+| --- | --- | --- | --- | --- |
+| R-01 | Compensation risk | Compensation_Paid_Percent < 50 | Prioritize payment blockers; verify funding availability, award details and notice delivery. | Prototype rule - not legal advice |
+| R-02 | R&R risk | RR_Completion_Percent < 50 | Prioritize unresolved R&R actions and affected-family follow-up. | Prototype rule - not legal advice |
+| R-03 | Legal risk | Legal_Cases >= 3 or Ownership_Conflicts >= 3 | Escalate for legal/record review and track dispute age. | Prototype rule - not legal advice |
+| R-04 | Documentation risk | Documentation_Percent < 60 | Trigger document and survey validation before next milestone. | Prototype rule - not legal advice |
+| R-05 | Stakeholder risk | Stakeholder_Response_Percent < 50 | Increase communication/consultation and track objections/grievances. | Prototype rule - not legal advice |
+| R-06 | Award risk | Award milestone materially overdue | Escalate milestone delay and review causes/required extension process. | Prototype rule - not legal advice |
+| R-07 | Possession risk | Compensation substantially incomplete + possession pending | Do not treat possession as ready; prioritize prerequisites and record handover status. | Prototype rule - not legal advice |
+| R-08 | Governance risk | Repeated missed updates / missing progress data | Escalate data completeness and assign responsible owner for update cadence. | Prototype rule - not legal advice |

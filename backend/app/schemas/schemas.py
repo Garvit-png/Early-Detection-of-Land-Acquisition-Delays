@@ -82,6 +82,9 @@ class ProjectBase(BaseModel):
     amount_paid_cr: Optional[float] = None
     project_value_cr: Optional[float] = None
     is_delayed: Optional[bool] = None
+    funding_readiness: Optional[float] = None
+    notice_delivery_pct: Optional[float] = None
+    mutation_completion_pct: Optional[float] = None
 
 
 class ProjectOut(ProjectBase):
@@ -182,6 +185,10 @@ class ProjectCreate(BaseModel):
 
     # Context
     officer_responsiveness:       float = Field(default=5.0, ge=1, le=10)
+    # FM-12 / FM-13 / FM-14
+    funding_readiness:            float = Field(default=75.0, ge=0, le=100)
+    notice_delivery_pct:          float = Field(default=75.0, ge=0, le=100)
+    mutation_completion_pct:      float = Field(default=0.0,  ge=0, le=100)
 
 
 class ProjectCreateResponse(BaseModel):

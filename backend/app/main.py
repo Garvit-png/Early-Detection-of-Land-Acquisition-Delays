@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.api.routes import auth, projects, predictions, dashboard, alerts, audit, history, actions
+from app.api.routes import auth, projects, predictions, dashboard, alerts, audit, history, actions, explain
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +78,7 @@ app.include_router(alerts.router,      prefix="/api")
 app.include_router(audit.router,       prefix="/api")
 app.include_router(history.router,     prefix="/api")
 app.include_router(actions.router,     prefix="/api")
+app.include_router(explain.router,     prefix="/api")
 
 
 @app.get("/")

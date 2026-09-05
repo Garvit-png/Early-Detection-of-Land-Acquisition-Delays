@@ -222,6 +222,32 @@ def generate_project(pid: int) -> dict:
     if days_since_update > 90:
         bdp = min(bdp + 0.04, 0.97)
 
+    # ── Funding readiness (FM-12 / ADMIN-03 / CAG-03) ────────────────────────────
+    # 0–100: how ready is the requiring body to release funds
+    if bdp > 0.65:
+        funding_readiness = round(random.uniform(10, 60), 1)
+    else:
+        funding_readiness = round(random.uniform(55, 100), 1)
+    if funding_readiness < 50:
+        bdp = min(bdp + 0.05, 0.97)
+
+    # ── Notice delivery % (FM-13 / ADMIN-04 / CAG-04) ────────────────────────────
+    # % of affected landowners/families who have received formal notices
+    if bdp > 0.65:
+        notice_delivery_pct = round(random.uniform(20, 70), 1)
+    else:
+        notice_delivery_pct = round(random.uniform(60, 100), 1)
+    if notice_delivery_pct < 60:
+        bdp = min(bdp + 0.04, 0.97)
+
+    # ── Mutation completion % (FM-14 / ADMIN-09 / CAG-13) ────────────────────────
+    # % of acquired parcels where ownership mutation in land records is complete
+    # Only meaningful post-possession; earlier stages default to 0
+    if current_stage_idx >= 4:
+        mutation_completion_pct = round(random.uniform(30, 95) if bdp > 0.5 else random.uniform(60, 100), 1)
+    else:
+        mutation_completion_pct = 0.0
+
     # ── Final label ───────────────────────────────────────────────────────────────
     fdp       = max(0.05, min(bdp + random.uniform(-0.05, 0.05), 0.97))
     is_delayed = 1 if random.random() < fdp else 0
@@ -291,6 +317,10 @@ def generate_project(pid: int) -> dict:
         "prev_delayed_district": prev_delayed_district,
         # Governance (R-08)
         "officer_responsiveness": officer_responsiveness,
+        # New: FM-12, FM-13, FM-14
+        "funding_readiness":        funding_readiness,
+        "notice_delivery_pct":      notice_delivery_pct,
+        "mutation_completion_pct":  mutation_completion_pct,
         # Labels
         "delay_probability": round(fdp, 4),
         "risk_score": risk_score,
@@ -323,6 +353,7 @@ def main():
         "land_cost_cr", "amount_paid_cr", "project_value_cr",
         "district_historical_delay_rate", "prev_delayed_district",
         "officer_responsiveness",
+        "funding_readiness", "notice_delivery_pct", "mutation_completion_pct",
         "is_delayed",
     ]
     df_ml = df[feature_cols].copy()

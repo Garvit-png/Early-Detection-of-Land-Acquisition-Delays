@@ -10,6 +10,7 @@ import MapPage from './pages/MapPage'
 import AlertsPage from './pages/AlertsPage'
 import AuditPage from './pages/AuditPage'
 import AnalyticsPage from './pages/AnalyticsPage'
+import ActionTrackingPage from './pages/ActionTrackingPage'
 
 function RequireAuth({ children }) {
   const token = localStorage.getItem('token')
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="map"                element={<MapPage />} />
             <Route path="alerts"             element={<AlertsPage />} />
             <Route path="analytics"          element={<AnalyticsPage />} />
+            <Route path="actions"            element={<ActionTrackingPage />} />
             <Route path="audit"              element={<AuditPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -98,6 +98,9 @@ class Project(Base):
     district_historical_delay_rate = Column(Float)
     prev_delayed_district         = Column(Integer)
     officer_responsiveness        = Column(Float)
+    funding_readiness             = Column(Float, nullable=True)   # FM-12 / CAG-03
+    notice_delivery_pct           = Column(Float, nullable=True)   # FM-13 / CAG-04
+    mutation_completion_pct       = Column(Float, nullable=True)   # FM-14 / CAG-13
     project_type_code             = Column(Integer)
     state_code                    = Column(Integer)
 

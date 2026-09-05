@@ -7,7 +7,7 @@ import {
 import {
   getProject, scoreProject, updateProject,
   getRiskHistory, getSimilarProjects, getProjectActions,
-  createAction, updateAction,
+  createAction, updateAction, getExplanation,
 } from '../services/api'
 import { Icon } from '../components/shared/Icons'
 
@@ -473,10 +473,11 @@ function EditModal({ project, onClose, onSaved }) {
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 const TABS = [
-  { key:'overview',  label:'Overview'      },
-  { key:'history',   label:'Risk History'  },
-  { key:'actions',   label:'Actions'       },
-  { key:'similar',   label:'Similar Projects' },
+  { key:'overview',     label:'Overview'         },
+  { key:'explanation',  label:'AI Explanation'   },
+  { key:'history',      label:'Risk History'     },
+  { key:'actions',      label:'Actions'          },
+  { key:'similar',      label:'Similar Projects' },
 ]
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -490,6 +491,8 @@ export default function ProjectDetailPage() {
   const [scoring,  setScoring]  = useState(false)
   const [tab,      setTab]      = useState('overview')
   const [showEdit, setShowEdit] = useState(false)
+  const [explanation, setExplanation] = useState(null)
+  const [explaining,  setExplaining]  = useState(false)
 
   const user = JSON.parse(localStorage.getItem('user') || '{}')
 
@@ -513,6 +516,17 @@ export default function ProjectDetailPage() {
     } catch(e) {
       alert('Scoring failed: ' + (e.response?.data?.detail || e.message))
     } finally { setScoring(false) }
+  }
+
+  async function handleExplain() {
+    setExplaining(true)
+    setTab('explanation')
+    try {
+      const r = await getExplanation(id)
+      setExplanation(r.data)
+    } catch(e) {
+      setExplanation({ error: e.response?.data?.detail || e.message })
+    } finally { setExplaining(false) }
   }
 
   if (loading) return <div className="spinner-wrap"><div className="spinner" /></div>
@@ -547,6 +561,10 @@ export default function ProjectDetailPage() {
         <div style={{ display:'flex', gap:8 }}>
           <button className="btn btn-outline" onClick={() => setShowEdit(true)}>
             Edit Details
+          </button>
+          <button className="btn btn-outline" onClick={handleExplain} disabled={explaining || !project.risk_score}
+            style={{ background: tab==='explanation' ? 'var(--primary-light)' : '' }}>
+            {explaining ? 'Explaining…' : 'AI Explain'}
           </button>
           <button className="btn btn-primary" onClick={handleScore} disabled={scoring}>
             <Icon.Refresh />{scoring ? 'Scoring…' : 'Re-score'}
@@ -607,6 +625,125 @@ export default function ProjectDetailPage() {
           </button>
         ))}
       </div>
+
+      {/* ── Tab: AI Explanation ── */}
+      {tab === 'explanation' && (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 320px', gap:20 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+            {explaining && (
+              <div className="card" style={{ padding:40, textAlign:'center' }}>
+                <div className="spinner" style={{ margin:'0 auto 16px' }} />
+                <div style={{ fontSize:13, color:'var(--gray-500)' }}>
+                  Querying AI with RAG context from LARR Act + CAG audit findings…
+                </div>
+              </div>
+            )}
+
+            {explanation?.error && (
+              <div className="card" style={{ padding:20, background:'var(--danger-light)', border:'1px solid var(--danger-border)' }}>
+                <div style={{ fontSize:13, fontWeight:700, color:'var(--danger)', marginBottom:6 }}>Explanation failed</div>
+                <div style={{ fontSize:12, color:'var(--danger)' }}>{explanation.error}</div>
+              </div>
+            )}
+
+            {explanation && !explanation.error && !explaining && (
+              <>
+                {/* Model badge */}
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:3,
+                    background: explanation.model_used === 'gpt-4o-mini' ? '#e0f2fe' : 'var(--gray-100)',
+                    color: explanation.model_used === 'gpt-4o-mini' ? '#0369a1' : 'var(--gray-500)',
+                    border: explanation.model_used === 'gpt-4o-mini' ? '1px solid #7dd3fc' : '1px solid var(--gray-200)',
+                  }}>
+                    {explanation.model_used === 'gpt-4o-mini' ? 'GPT-4o-mini' : 'Rule-based fallback'}
+                  </span>
+                  <span style={{ fontSize:11, color:'var(--gray-400)' }}>
+                    {explanation.kb_chunks_used} KB chunks · {explanation.tokens_used || 0} tokens
+                  </span>
+                  {explanation.sources?.length > 0 && (
+                    <span style={{ fontSize:11, color:'var(--gray-400)' }}>
+                      Citations: {explanation.sources.slice(0,6).join(', ')}{explanation.sources.length > 6 ? '…' : ''}
+                    </span>
+                  )}
+                </div>
+
+                {/* WHY */}
+                <div className="card">
+                  <div className="detail-section-title" style={{ color:'var(--danger)', borderColor:'var(--danger-border)' }}>
+                    Why This Risk Score
+                  </div>
+                  <div style={{ fontSize:13, color:'var(--gray-700)', lineHeight:1.7, whiteSpace:'pre-wrap' }}>
+                    {explanation.why}
+                  </div>
+                </div>
+
+                {/* ACTIONS */}
+                {explanation.actions && (
+                  <div className="card">
+                    <div className="detail-section-title" style={{ color:'var(--warning)', borderColor:'var(--warning-border)' }}>
+                      Recommended Actions
+                    </div>
+                    <div style={{ fontSize:13, color:'var(--gray-700)', lineHeight:1.7, whiteSpace:'pre-wrap' }}>
+                      {explanation.actions}
+                    </div>
+                  </div>
+                )}
+
+                {/* LEGAL BASIS */}
+                {explanation.legal_basis && (
+                  <div className="card" style={{ background:'var(--gray-50)' }}>
+                    <div className="detail-section-title">
+                      Legal Basis (LARR Act / CAG Audit)
+                    </div>
+                    <div style={{ fontSize:12, color:'var(--gray-600)', lineHeight:1.7, whiteSpace:'pre-wrap' }}>
+                      {explanation.legal_basis}
+                    </div>
+                    <div style={{ marginTop:12, fontSize:11, color:'var(--gray-400)', borderTop:'1px solid var(--gray-200)', paddingTop:10 }}>
+                      Sources: LARR Act 2013 (indiacode.nic.in) · CAG Audit Reports (cag.gov.in)
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {!explanation && !explaining && (
+              <div className="card" style={{ padding:40, textAlign:'center' }}>
+                <div style={{ fontSize:13, color:'var(--gray-500)', marginBottom:16 }}>
+                  Click "AI Explain" to generate a grounded explanation citing LARR Act provisions and CAG audit findings.
+                </div>
+                <button className="btn btn-primary" onClick={handleExplain} disabled={!project.risk_score}>
+                  Generate AI Explanation
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Right: KB sources sidebar */}
+          <div className="card" style={{ alignSelf:'flex-start' }}>
+            <div className="detail-section-title">Knowledge Base Sources</div>
+            {[
+              { id:'LARR Act 2013', desc:'Legal framework for land acquisition, compensation & R&R', url:'https://www.indiacode.nic.in/' },
+              { id:'CAG MP Report', desc:'Audit findings: compensation delays, award overdue, record issues', url:'https://cag.gov.in/' },
+              { id:'CAG Telangana', desc:'Cross-state delay evidence, staffing & coordination issues', url:'https://cag.gov.in/' },
+              { id:'R-01 to R-08', desc:'8 prototype recommendation rules from SIH KB', url:'' },
+              { id:'FM-01 to FM-14', desc:'14 feature mappings with evidence strength ratings', url:'' },
+              { id:'LIFE-01..10', desc:'Lifecycle stage signals and delay indicators', url:'' },
+              { id:'ADMIN-01..10', desc:'Administrative bottleneck patterns and actions', url:'' },
+            ].map(s => (
+              <div key={s.id} style={{ display:'flex', flexDirection:'column', padding:'8px 0', borderBottom:'1px solid var(--gray-100)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span style={{ fontSize:11, fontWeight:700, fontFamily:'var(--font-mono)', color:'var(--primary)' }}>{s.id}</span>
+                  {s.url && <a href={s.url} target="_blank" rel="noreferrer" style={{ fontSize:10, color:'var(--primary-light)', textDecoration:'none' }} onClick={e=>e.stopPropagation()}>↗</a>}
+                </div>
+                <span style={{ fontSize:11, color:'var(--gray-500)', marginTop:2 }}>{s.desc}</span>
+              </div>
+            ))}
+            <div style={{ marginTop:12, fontSize:11, color:'var(--gray-400)', lineHeight:1.5 }}>
+              Total: 72 KB chunks across 4 knowledge-base files. Retrieved contextually based on triggered rules and acquisition stage.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Tab: Overview ── */}
       {tab === 'overview' && (
