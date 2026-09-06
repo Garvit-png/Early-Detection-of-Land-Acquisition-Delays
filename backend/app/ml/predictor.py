@@ -21,13 +21,21 @@ PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "../../.."))
 
 
 def get_models_dir() -> str:
-    """Get models directory — works locally and on Vercel."""
-    # Vercel: backend/data/models (copied via includeFiles)
-    vercel_dir = os.path.join(PROJECT_ROOT, "backend", "data", "models")
-    if os.path.exists(vercel_dir):
-        return vercel_dir
-    # Local: data/models at project root
-    return os.path.join(PROJECT_ROOT, "data", "models")
+    """Get models directory — works locally, on Railway, and on Vercel."""
+    candidates = [
+        # Railway: root dir is /app, backend is root directory → data/models
+        os.path.join(BASE_DIR, "../../data/models"),
+        # Local: backend/data/models
+        os.path.join(PROJECT_ROOT, "backend", "data", "models"),
+        # Fallback: relative to project root
+        os.path.join(PROJECT_ROOT, "data", "models"),
+    ]
+    for path in candidates:
+        resolved = os.path.abspath(path)
+        if os.path.exists(os.path.join(resolved, "xgb_delay_model.json")):
+            return resolved
+    # Default fallback
+    return os.path.abspath(candidates[0])
 
 
 MODELS_DIR = get_models_dir()

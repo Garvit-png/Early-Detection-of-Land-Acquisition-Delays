@@ -28,14 +28,38 @@ PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "../../.."))
 
 def get_models_dir() -> str:
     """Get models directory — works locally and on Vercel."""
-    vercel_dir = os.path.join(PROJECT_ROOT, "backend", "data", "models")
-    if os.path.exists(vercel_dir):
-        return vercel_dir
-    return os.path.join(PROJECT_ROOT, "data", "models")
+def get_models_dir() -> str:
+    """Get models directory — works locally, on Railway, and on Vercel."""
+    candidates = [
+        os.path.join(BASE_DIR, "../../data/models"),
+        os.path.join(PROJECT_ROOT, "backend", "data", "models"),
+        os.path.join(PROJECT_ROOT, "data", "models"),
+    ]
+    for path in candidates:
+        resolved = os.path.abspath(path)
+        if os.path.exists(os.path.join(resolved, "xgb_delay_model.json")):
+            return resolved
+    return os.path.abspath(candidates[0])
 
 
 MODELS_DIR = get_models_dir()
-CSV_FALLBACK = os.path.join(PROJECT_ROOT, "data/processed/projects_ml.csv")
+
+
+def get_csv_path() -> str:
+    """Get training CSV path — works locally and on Railway."""
+    candidates = [
+        os.path.join(BASE_DIR, "../../../data/processed/projects_ml.csv"),
+        os.path.join(PROJECT_ROOT, "data/processed/projects_ml.csv"),
+        os.path.join(PROJECT_ROOT, "backend/../data/processed/projects_ml.csv"),
+    ]
+    for path in candidates:
+        resolved = os.path.abspath(path)
+        if os.path.exists(resolved):
+            return resolved
+    return os.path.abspath(candidates[0])
+
+
+CSV_FALLBACK = get_csv_path()
 
 # ── 31 features — all 8 CSV rules + FM-12/13/14 covered ─────────────────────────
 FEATURE_COLS = [
