@@ -4,6 +4,7 @@
   "devCommand": "uvicorn app.main:app --reload",
   "installCommand": "pip install -r requirements.txt",
   "framework": "fastapi",
+  "entrypoint": "app.main:app",
   "functions": {
     "app/main.py": {
       "maxDuration": 30
