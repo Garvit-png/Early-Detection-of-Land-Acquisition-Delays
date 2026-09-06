@@ -14,11 +14,12 @@ env/
 # Environment
 .env
 
-# Data — raw/processed CSVs and model binaries (large files)
+# Data — raw CSVs excluded (too large)
 data/raw/*.csv
-data/processed/*.csv
-data/models/*.pkl
-data/models/*.json
+# processed CSV and model files ARE included for Railway deployment
+# data/processed/*.csv
+# data/models/*.pkl
+# data/models/*.json
 
 # Node
 node_modules/
@@ -35,3 +36,5 @@ frontend/.vite/
 
 # Logs
 *.log
+.vercel
+.env*
