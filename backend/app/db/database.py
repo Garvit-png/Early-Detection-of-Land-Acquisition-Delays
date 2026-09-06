@@ -20,15 +20,24 @@ def _get_db_url():
     # If already has a driver specified, use as-is
     if "+pg8000" in url or "+psycopg2" in url:
         return url
-    # Replace generic postgresql:// with pg8000 driver
+    # pg8000 doesn't accept sslmode/channel_binding as URL params — strip them
+    # and handle SSL via connect_args instead
+    import re
+    url = re.sub(r'[?&]sslmode=[^&]*', '', url)
+    url = re.sub(r'[?&]channel_binding=[^&]*', '', url)
+    url = re.sub(r'\?$', '', url)  # remove trailing ?
     return url.replace("postgresql://", "postgresql+pg8000://", 1)
 
 _db_url = _get_db_url()
+
+# pg8000 needs ssl passed as connect_arg, not URL param
+_connect_args = {"ssl_context": True} if "neon.tech" in (_db_url or "") else {}
 
 if _is_serverless:
     engine = create_engine(
         _db_url,
         poolclass=NullPool,
+        connect_args=_connect_args,
     )
 else:
     engine = create_engine(
@@ -37,6 +46,7 @@ else:
         pool_pre_ping=True,
         pool_size=5,
         max_overflow=10,
+        connect_args=_connect_args,
     )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
