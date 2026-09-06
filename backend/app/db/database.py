@@ -7,24 +7,32 @@ from sqlalchemy.pool import NullPool, QueuePool
 
 from app.core.config import settings
 
-# On Vercel (serverless), each invocation is stateless — persistent connection
-# pools cause "too many connections" errors on Neon/PgBouncer.
-# Use NullPool in production (VERCEL=1 is set automatically by Vercel).
-_is_serverless = os.environ.get("VERCEL") == "1"
+# On Railway/Vercel (serverless), use NullPool.
+# RAILWAY_ENVIRONMENT is set automatically by Railway.
+_is_serverless = os.environ.get("VERCEL") == "1" or os.environ.get("RAILWAY_ENVIRONMENT") is not None
+
+# SQLAlchemy needs the right driver prefix:
+# - psycopg2  → postgresql+psycopg2://
+# - pg8000    → postgresql+pg8000://
+# We auto-detect by trying psycopg2 first, fall back to pg8000.
+def _get_db_url():
+    url = settings.DATABASE_URL
+    # If already has a driver specified, use as-is
+    if "+pg8000" in url or "+psycopg2" in url:
+        return url
+    # Replace generic postgresql:// with pg8000 driver
+    return url.replace("postgresql://", "postgresql+pg8000://", 1)
+
+_db_url = _get_db_url()
 
 if _is_serverless:
     engine = create_engine(
-        settings.DATABASE_URL,
-        poolclass=NullPool,          # no persistent pool — open/close per request
-        connect_args={
-            "sslmode": "require",    # Neon requires SSL
-            "connect_timeout": 10,
-        },
+        _db_url,
+        poolclass=NullPool,
     )
 else:
-    # Local dev — keep a normal pool for performance
     engine = create_engine(
-        settings.DATABASE_URL,
+        _db_url,
         poolclass=QueuePool,
         pool_pre_ping=True,
         pool_size=5,
