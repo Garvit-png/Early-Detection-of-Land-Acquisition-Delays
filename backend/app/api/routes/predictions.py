@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import CurrentUser, get_db, log_action
 from app.db.models import Alert, Project, RiskCategory, UserRole
-from app.ml.predictor import predictor
+from app.ml.predictor import predictor, get_models_dir
 from app.schemas.schemas import (
     ModelStatus, PredictionResponse, RetrainResponse,
 )
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/predictions", tags=["Predictions"])
 
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "../../../.."))
-MODELS_DIR   = os.path.join(PROJECT_ROOT, "data/models")
+MODELS_DIR   = get_models_dir()
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────────

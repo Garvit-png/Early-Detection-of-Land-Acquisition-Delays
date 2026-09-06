@@ -18,9 +18,19 @@ from sklearn.model_selection import train_test_split
 
 logger = logging.getLogger(__name__)
 
-BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "../../.."))
-MODELS_DIR   = os.path.join(PROJECT_ROOT, "data/models")
+
+
+def get_models_dir() -> str:
+    """Get models directory — works locally and on Vercel."""
+    vercel_dir = os.path.join(PROJECT_ROOT, "backend", "data", "models")
+    if os.path.exists(vercel_dir):
+        return vercel_dir
+    return os.path.join(PROJECT_ROOT, "data", "models")
+
+
+MODELS_DIR = get_models_dir()
 CSV_FALLBACK = os.path.join(PROJECT_ROOT, "data/processed/projects_ml.csv")
 
 # ── 31 features — all 8 CSV rules + FM-12/13/14 covered ─────────────────────────

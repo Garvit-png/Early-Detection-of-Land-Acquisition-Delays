@@ -7,7 +7,13 @@
     "backend": {
       "root": "backend",
       "framework": "fastapi",
-      "entrypoint": "app.main:app"
+      "entrypoint": "app.main:app",
+      "includeFiles": [
+        "app/**",
+        "data/models/xgb_delay_model.json",
+        "data/models/shap_explainer.pkl",
+        "data/models/feature_config.json"
+      ]
     }
   },
   "rewrites": [

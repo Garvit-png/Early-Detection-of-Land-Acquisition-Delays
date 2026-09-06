@@ -26,8 +26,17 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "../../.."))
-MODELS_DIR   = os.path.join(PROJECT_ROOT, "data/models")
 CSV_PATH     = os.path.join(PROJECT_ROOT, "data/processed/projects_ml.csv")
+
+
+def get_models_dir() -> str:
+    vercel_dir = os.path.join(PROJECT_ROOT, "backend", "data", "models")
+    if os.path.exists(vercel_dir):
+        return vercel_dir
+    return os.path.join(PROJECT_ROOT, "data", "models")
+
+
+MODELS_DIR = get_models_dir()
 
 STAGE_NAMES = [
     "Section 11 Notification",

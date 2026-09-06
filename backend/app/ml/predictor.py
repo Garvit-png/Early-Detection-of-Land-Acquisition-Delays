@@ -12,9 +12,21 @@ import numpy as np
 import pandas as pd
 import xgboost as xgb
 
-BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "../../.."))
-MODELS_DIR   = os.path.join(PROJECT_ROOT, "data/models")
+
+
+def get_models_dir() -> str:
+    """Get models directory — works locally and on Vercel."""
+    # Vercel: backend/data/models (copied via includeFiles)
+    vercel_dir = os.path.join(PROJECT_ROOT, "backend", "data", "models")
+    if os.path.exists(vercel_dir):
+        return vercel_dir
+    # Local: data/models at project root
+    return os.path.join(PROJECT_ROOT, "data", "models")
+
+
+MODELS_DIR = get_models_dir()
 
 
 class DelayPredictor:
