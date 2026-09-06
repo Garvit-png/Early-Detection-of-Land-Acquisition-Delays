@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["python312", "gcc", "libpq"]
+nixPkgs = ["python312", "gcc", "postgresql", "libpq.dev", "openssl"]
 
 [phases.install]
 cmds = ["pip install -r requirements.txt"]
