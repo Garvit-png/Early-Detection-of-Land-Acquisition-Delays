@@ -8,13 +8,17 @@ import logging
 import os
 from datetime import datetime, timezone
 
-import joblib
-import numpy as np
-import pandas as pd
-import shap
-import xgboost as xgb
-from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
-from sklearn.model_selection import train_test_split
+try:
+    import joblib
+    import numpy as np
+    import pandas as pd
+    import shap
+    import xgboost as xgb
+    from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
+    from sklearn.model_selection import train_test_split
+    ML_AVAILABLE = True
+except ImportError:
+    ML_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -190,6 +194,19 @@ def _load_training_data(db=None) -> pd.DataFrame:
 
 
 def retrain(db=None) -> dict:
+    if not ML_AVAILABLE:
+        logger.info("ML_AVAILABLE is False. Retraining disabled.")
+        return {
+            "accuracy": 0.0,
+            "roc_auc": 0.0,
+            "f1_score": 0.0,
+            "train_rows": 0,
+            "test_rows": 0,
+            "feature_count": len(FEATURE_COLS),
+            "trained_at": datetime.now(timezone.utc).isoformat(),
+            "data_source": "mock"
+        }
+
     os.makedirs(MODELS_DIR, exist_ok=True)
     started_at = datetime.now(timezone.utc)
     logger.info("Retraining started (26 features, 8 CSV rules)...")

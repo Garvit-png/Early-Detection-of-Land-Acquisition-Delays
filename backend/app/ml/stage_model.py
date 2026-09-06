@@ -15,12 +15,16 @@ Stages:
 """
 
 import json, os, logging
-import joblib
-import numpy as np
-import pandas as pd
-import xgboost as xgb
-from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
-from sklearn.model_selection import train_test_split
+try:
+    import joblib
+    import numpy as np
+    import pandas as pd
+    import xgboost as xgb
+    from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
+    from sklearn.model_selection import train_test_split
+    ML_AVAILABLE = True
+except ImportError:
+    ML_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +83,9 @@ STAGE_FEATURES = [
 
 def train_stage_models(csv_path: str = CSV_PATH) -> dict:
     """Train one model per stage. Returns metrics dict."""
+    if not ML_AVAILABLE:
+        logger.info("ML_AVAILABLE is False, skipping training.")
+        return {}
     if not os.path.exists(csv_path):
         raise FileNotFoundError(f"CSV not found: {csv_path}")
 
@@ -170,9 +177,14 @@ class StagePredictor:
     def load(self):
         if self._loaded:
             return
+        
         self.models   = {}
         self.features = STAGE_FEATURES
         self.stage_names = STAGE_NAMES
+        
+        if not ML_AVAILABLE:
+            self._loaded = True
+            return
 
         for idx in range(6):
             path = os.path.join(MODELS_DIR, f"stage_model_{idx}.json")
@@ -191,6 +203,23 @@ class StagePredictor:
         self.load()
         results = []
         for idx, name in enumerate(STAGE_NAMES):
+            if not ML_AVAILABLE:
+                score = 50.0
+                cat = "Medium"
+                prob = 0.5
+                drivers = [{"feature": "days_in_current_stage", "importance": 0.5}]
+                action = _stage_action(idx, features, score)
+                results.append({
+                    "stage_index":       idx,
+                    "stage_name":        name,
+                    "delay_probability": round(prob, 4),
+                    "risk_score":        score,
+                    "risk_category":     cat,
+                    "top_drivers":       drivers,
+                    "corrective_action": action,
+                })
+                continue
+                
             model = self.models.get(idx)
             if model is None:
                 results.append({
