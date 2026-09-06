@@ -1,0 +1,19 @@
+# Exclude heavy files from Vercel bundle
+data/
+backend/data/raw/
+backend/data/processed/
+backend/__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.coverage
+*.egg-info/
+dist/
+build/
+*.log
+uvicorn.log
+.env
+*.md
+scripts/
+tests/
