@@ -91,7 +91,9 @@ export default function SubmitProjectPage() {
     documentation_pct: '75', stakeholder_response_pct: '75',
     budget_released: true, noc_pending_count: '0',
     land_cost_cr: '0', amount_paid_cr: '0', project_value_cr: '0',
-    officer_responsiveness: '5', latitude: '', longitude: '',
+    officer_responsiveness: '5',
+    funding_readiness: '75', notice_delivery_pct: '75', mutation_completion_pct: '0',
+    latitude: '', longitude: '',
   })
 
   function set(e) {
@@ -125,6 +127,9 @@ export default function SubmitProjectPage() {
         amount_paid_cr:              parseFloat(form.amount_paid_cr) || 0,
         project_value_cr:            parseFloat(form.project_value_cr) || 0,
         officer_responsiveness:      parseFloat(form.officer_responsiveness) || 5,
+        funding_readiness:           parseFloat(form.funding_readiness) || 75,
+        notice_delivery_pct:         parseFloat(form.notice_delivery_pct) || 75,
+        mutation_completion_pct:     parseFloat(form.mutation_completion_pct) || 0,
         latitude:  form.latitude  ? parseFloat(form.latitude)  : null,
         longitude: form.longitude ? parseFloat(form.longitude) : null,
       }
@@ -409,7 +414,19 @@ export default function SubmitProjectPage() {
                 <Input name="officer_responsiveness" value={form.officer_responsiveness} onChange={set}
                   type="number" min="1" max="10" step="0.1" />
               </Field>
-            </div>
+              <Field label="Funding Readiness (%)" hint="FM-12: requiring body fund availability">
+                <Input name="funding_readiness" value={form.funding_readiness} onChange={set}
+                  type="number" min="0" max="100" step="0.1" />
+              </Field>
+              <Field label="Notice Delivery (%)" hint="FM-13: % landowners served notices">
+                <Input name="notice_delivery_pct" value={form.notice_delivery_pct} onChange={set}
+                  type="number" min="0" max="100" step="0.1" />
+              </Field>
+              <Field label="Mutation Completion (%)" hint="FM-14: ownership record transfer">
+                <Input name="mutation_completion_pct" value={form.mutation_completion_pct} onChange={set}
+                  type="number" min="0" max="100" step="0.1" />
+</Field>
+             </div>
 
             {/* AI notice */}
             <div style={{ padding: '14px 16px', background: 'var(--primary-light)', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-lg)' }}>

@@ -9,7 +9,12 @@ import { useAuth } from '../store/authStore'
 import { Icon } from '../components/shared/Icons'
 import ModelStatusCard from '../components/dashboard/ModelStatusCard'
 
-const PIE_COLORS = ['#c0392b', '#b7770d', '#1a6b3a', '#9aa0ae']
+const RISK_COLORS = {
+  'High Risk': '#c0392b',
+  'Medium Risk': '#b7770d',
+  'Low Risk': '#1a6b3a',
+  'Unscored': '#9aa0ae',
+}
 
 function StatCard({ label, value, sub, variant = 'default', icon: IconComp }) {
   return (
@@ -65,11 +70,11 @@ export default function DashboardPage() {
   if (!stats) return <div className="empty-state"><div className="empty-state-text">Failed to load dashboard data.</div></div>
 
   const pieData = [
-    { name: 'High Risk',   value: stats.high_risk },
-    { name: 'Medium Risk', value: stats.medium_risk },
-    { name: 'Low Risk',    value: stats.low_risk },
-    { name: 'Unscored',   value: stats.unscored },
-  ]
+    { name: 'High Risk',   value: Number(stats.high_risk) || 0,   color: RISK_COLORS['High Risk'] },
+    { name: 'Medium Risk', value: Number(stats.medium_risk) || 0, color: RISK_COLORS['Medium Risk'] },
+    { name: 'Low Risk',    value: Number(stats.low_risk) || 0,    color: RISK_COLORS['Low Risk'] },
+    { name: 'Unscored',   value: Number(stats.unscored) || 0,   color: RISK_COLORS['Unscored'] },
+  ].filter(d => d.value > 0)
 
   return (
     <>
@@ -105,14 +110,14 @@ export default function DashboardPage() {
           <div className="card-header">
             <div className="card-title">Risk Distribution</div>
           </div>
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={280}>
             <PieChart>
               <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
                 outerRadius={80} innerRadius={40}
                 label={({ name, percent }) => percent > 0.04 ? `${(percent*100).toFixed(0)}%` : ''}>
-                {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i]} />)}
+                {pieData.map((d, i) => <Cell key={i} fill={d.color} />)}
               </Pie>
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} layout="vertical" align="right" verticalAlign="middle" />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
             </PieChart>
           </ResponsiveContainer>

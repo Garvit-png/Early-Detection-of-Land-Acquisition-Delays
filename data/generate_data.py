@@ -17,64 +17,143 @@ np.random.seed(42)
 STATES_DISTRICTS = {
     "Uttar Pradesh": {
         "districts": ["Lucknow","Agra","Varanasi","Kanpur","Allahabad","Meerut","Noida","Ghaziabad","Mathura","Aligarh"],
-        "lat_range": (23.9, 30.4), "lon_range": (77.1, 84.6), "delay_bias": 0.70
+        "delay_bias": 0.70,
     },
     "Bihar": {
         "districts": ["Patna","Gaya","Muzaffarpur","Bhagalpur","Darbhanga","Purnia","Ara","Hajipur","Chapra","Sitamarhi"],
-        "lat_range": (24.3, 27.5), "lon_range": (83.3, 88.3), "delay_bias": 0.72
+        "delay_bias": 0.72,
     },
     "Rajasthan": {
         "districts": ["Jaipur","Jodhpur","Udaipur","Kota","Ajmer","Bikaner","Alwar","Bharatpur","Sikar","Nagaur"],
-        "lat_range": (23.1, 30.2), "lon_range": (69.5, 78.3), "delay_bias": 0.55
+        "delay_bias": 0.55,
     },
     "Maharashtra": {
         "districts": ["Mumbai","Pune","Nagpur","Nashik","Aurangabad","Solapur","Amravati","Kolhapur","Thane","Latur"],
-        "lat_range": (15.6, 22.1), "lon_range": (72.6, 80.9), "delay_bias": 0.45
+        "delay_bias": 0.45,
     },
     "Gujarat": {
         "districts": ["Ahmedabad","Surat","Vadodara","Rajkot","Bhavnagar","Jamnagar","Gandhinagar","Anand","Mehsana","Bharuch"],
-        "lat_range": (20.1, 24.7), "lon_range": (68.2, 74.5), "delay_bias": 0.38
+        "delay_bias": 0.38,
     },
     "Madhya Pradesh": {
         "districts": ["Bhopal","Indore","Gwalior","Jabalpur","Ujjain","Rewa","Satna","Sagar","Ratlam","Dewas"],
-        "lat_range": (21.1, 26.9), "lon_range": (74.0, 82.8), "delay_bias": 0.60
+        "delay_bias": 0.60,
     },
     "West Bengal": {
         "districts": ["Kolkata","Howrah","North 24 Parganas","South 24 Parganas","Bardhaman","Murshidabad","Nadia","Malda","Jalpaiguri","Darjeeling"],
-        "lat_range": (21.5, 27.2), "lon_range": (85.8, 89.9), "delay_bias": 0.62
+        "delay_bias": 0.62,
     },
     "Odisha": {
         "districts": ["Bhubaneswar","Cuttack","Berhampur","Sambalpur","Rourkela","Brahmapur","Puri","Koraput","Balasore","Kendujhar"],
-        "lat_range": (17.8, 22.6), "lon_range": (81.4, 87.5), "delay_bias": 0.58
+        "delay_bias": 0.58,
     },
     "Jharkhand": {
         "districts": ["Ranchi","Jamshedpur","Dhanbad","Bokaro","Deoghar","Hazaribagh","Giridih","Ramgarh","Chaibasa","Dumka"],
-        "lat_range": (21.9, 25.3), "lon_range": (83.3, 87.9), "delay_bias": 0.68
+        "delay_bias": 0.68,
     },
     "Karnataka": {
         "districts": ["Bengaluru","Mysuru","Hubballi","Mangaluru","Belagavi","Davangere","Ballari","Tumakuru","Shivamogga","Vijayapura"],
-        "lat_range": (11.6, 18.5), "lon_range": (74.0, 78.6), "delay_bias": 0.42
+        "delay_bias": 0.42,
     },
     "Tamil Nadu": {
         "districts": ["Chennai","Coimbatore","Madurai","Tiruchirappalli","Salem","Tirunelveli","Erode","Vellore","Thoothukudi","Dindigul"],
-        "lat_range": (8.1, 13.6), "lon_range": (76.2, 80.3), "delay_bias": 0.40
+        "delay_bias": 0.40,
     },
     "Andhra Pradesh": {
         "districts": ["Visakhapatnam","Vijayawada","Guntur","Tirupati","Kakinada","Nellore","Kurnool","Rajahmundry","Anantapur","Kadapa"],
-        "lat_range": (12.4, 19.9), "lon_range": (76.8, 84.8), "delay_bias": 0.50
+        "delay_bias": 0.50,
     },
     "Telangana": {
         "districts": ["Hyderabad","Warangal","Nizamabad","Karimnagar","Khammam","Nalgonda","Medak","Mahbubnagar","Adilabad","Rangareddy"],
-        "lat_range": (15.8, 19.9), "lon_range": (77.2, 81.3), "delay_bias": 0.48
+        "delay_bias": 0.48,
     },
     "Punjab": {
         "districts": ["Ludhiana","Amritsar","Jalandhar","Patiala","Bathinda","Mohali","Pathankot","Hoshiarpur","Firozpur","Moga"],
-        "lat_range": (29.5, 32.5), "lon_range": (73.9, 76.9), "delay_bias": 0.44
+        "delay_bias": 0.44,
     },
     "Haryana": {
         "districts": ["Faridabad","Gurugram","Hisar","Rohtak","Ambala","Karnal","Sonipat","Panipat","Yamunanagar","Bhiwani"],
-        "lat_range": (27.6, 30.9), "lon_range": (74.5, 77.6), "delay_bias": 0.47
+        "delay_bias": 0.47,
     },
+}
+
+# Real district centroids (lat, lon) — jitter applied per-project for spread
+DISTRICT_COORDS = {
+    # Uttar Pradesh
+    "Lucknow":(26.85,80.95),"Agra":(27.18,78.01),"Varanasi":(25.32,83.01),
+    "Kanpur":(26.46,80.33),"Allahabad":(25.44,81.84),"Meerut":(28.98,77.71),
+    "Noida":(28.54,77.39),"Ghaziabad":(28.67,77.45),"Mathura":(27.49,77.67),
+    "Aligarh":(27.88,78.08),
+    # Bihar
+    "Patna":(25.59,85.14),"Gaya":(24.80,84.99),"Muzaffarpur":(26.12,85.39),
+    "Bhagalpur":(25.25,86.97),"Darbhanga":(26.15,85.90),"Purnia":(25.78,87.47),
+    "Ara":(25.55,84.66),"Hajipur":(25.69,85.21),"Chapra":(25.78,84.74),
+    "Sitamarhi":(26.59,85.48),
+    # Rajasthan
+    "Jaipur":(26.91,75.79),"Jodhpur":(26.30,73.02),"Udaipur":(24.58,73.68),
+    "Kota":(25.18,75.83),"Ajmer":(26.45,74.64),"Bikaner":(28.02,73.31),
+    "Alwar":(27.56,76.63),"Bharatpur":(27.22,77.49),"Sikar":(27.61,75.14),
+    "Nagaur":(27.20,73.73),
+    # Maharashtra
+    "Mumbai":(19.08,72.88),"Pune":(18.52,73.86),"Nagpur":(21.15,79.09),
+    "Nashik":(19.99,73.79),"Aurangabad":(19.88,75.34),"Solapur":(17.68,75.91),
+    "Amravati":(20.93,77.75),"Kolhapur":(16.70,74.24),"Thane":(19.21,72.97),
+    "Latur":(18.40,76.56),
+    # Gujarat
+    "Ahmedabad":(23.02,72.57),"Surat":(21.17,72.83),"Vadodara":(22.31,73.18),
+    "Rajkot":(22.30,70.80),"Bhavnagar":(21.76,72.15),"Jamnagar":(22.47,70.07),
+    "Gandhinagar":(23.22,72.65),"Anand":(22.56,72.93),"Mehsana":(23.59,72.38),
+    "Bharuch":(21.70,72.99),
+    # Madhya Pradesh
+    "Bhopal":(23.26,77.41),"Indore":(22.72,75.86),"Gwalior":(26.21,78.18),
+    "Jabalpur":(23.17,79.94),"Ujjain":(23.18,75.77),"Rewa":(24.53,81.30),
+    "Satna":(24.60,80.83),"Sagar":(23.84,78.73),"Ratlam":(23.33,75.04),
+    "Dewas":(22.96,76.05),
+    # West Bengal
+    "Kolkata":(22.57,88.36),"Howrah":(22.59,88.31),"North 24 Parganas":(22.93,88.53),
+    "South 24 Parganas":(22.16,88.55),"Bardhaman":(23.23,87.86),"Murshidabad":(24.18,88.27),
+    "Nadia":(23.47,88.56),"Malda":(25.01,88.14),"Jalpaiguri":(26.54,88.73),
+    "Darjeeling":(27.04,88.27),
+    # Odisha
+    "Bhubaneswar":(20.30,85.84),"Cuttack":(20.46,85.88),"Berhampur":(19.31,84.79),
+    "Sambalpur":(21.47,83.97),"Rourkela":(22.22,84.86),"Brahmapur":(19.31,84.79),
+    "Puri":(19.81,85.83),"Koraput":(18.81,82.71),"Balasore":(21.49,86.93),
+    "Kendujhar":(21.63,85.58),
+    # Jharkhand
+    "Ranchi":(23.34,85.31),"Jamshedpur":(22.80,86.20),"Dhanbad":(23.80,86.44),
+    "Bokaro":(23.67,86.15),"Deoghar":(24.48,86.70),"Hazaribagh":(23.99,85.36),
+    "Giridih":(24.19,86.31),"Ramgarh":(23.63,85.51),"Chaibasa":(22.55,85.80),
+    "Dumka":(24.27,87.25),
+    # Karnataka
+    "Bengaluru":(12.97,77.59),"Mysuru":(12.30,76.65),"Hubballi":(15.36,75.12),
+    "Mangaluru":(12.87,74.84),"Belagavi":(15.85,74.50),"Davangere":(14.46,75.92),
+    "Ballari":(15.15,76.92),"Tumakuru":(13.34,77.10),"Shivamogga":(13.93,75.57),
+    "Vijayapura":(16.83,75.72),
+    # Tamil Nadu
+    "Chennai":(13.08,80.27),"Coimbatore":(11.02,76.96),"Madurai":(9.93,78.12),
+    "Tiruchirappalli":(10.79,78.70),"Salem":(11.65,78.16),"Tirunelveli":(8.73,77.70),
+    "Erode":(11.34,77.73),"Vellore":(12.92,79.13),"Thoothukudi":(8.76,78.14),
+    "Dindigul":(10.36,77.97),
+    # Andhra Pradesh
+    "Visakhapatnam":(17.69,83.22),"Vijayawada":(16.51,80.62),"Guntur":(16.30,80.44),
+    "Tirupati":(13.63,79.42),"Kakinada":(16.93,82.24),"Nellore":(14.44,79.99),
+    "Kurnool":(15.83,78.04),"Rajahmundry":(16.98,81.78),"Anantapur":(14.68,77.60),
+    "Kadapa":(14.47,78.82),
+    # Telangana
+    "Hyderabad":(17.38,78.49),"Warangal":(17.97,79.59),"Nizamabad":(18.67,78.09),
+    "Karimnagar":(18.43,79.13),"Khammam":(17.25,80.15),"Nalgonda":(17.05,79.27),
+    "Medak":(18.05,78.26),"Mahbubnagar":(16.74,77.98),"Adilabad":(19.67,78.53),
+    "Rangareddy":(17.24,78.39),
+    # Punjab
+    "Ludhiana":(30.90,75.85),"Amritsar":(31.63,74.87),"Jalandhar":(31.33,75.57),
+    "Patiala":(30.34,76.39),"Bathinda":(30.21,74.95),"Mohali":(30.70,76.72),
+    "Pathankot":(32.27,75.65),"Hoshiarpur":(31.53,75.91),"Firozpur":(30.93,74.61),
+    "Moga":(30.82,75.17),
+    # Haryana
+    "Faridabad":(28.41,77.31),"Gurugram":(28.46,77.03),"Hisar":(29.15,75.72),
+    "Rohtak":(28.89,76.61),"Ambala":(30.38,76.78),"Karnal":(29.69,76.99),
+    "Sonipat":(28.99,77.02),"Panipat":(29.39,76.97),"Yamunanagar":(30.13,77.27),
+    "Bhiwani":(28.79,76.14),
 }
 
 PROJECT_TYPES = [
@@ -114,8 +193,10 @@ def generate_project(pid: int) -> dict:
     state      = random.choice(list(STATES_DISTRICTS.keys()))
     sd         = STATES_DISTRICTS[state]
     district   = random.choice(sd["districts"])
-    lat        = round(random.uniform(*sd["lat_range"]), 6)
-    lon        = round(random.uniform(*sd["lon_range"]), 6)
+    # Use district centroid + small jitter so dots spread across the real India map
+    base_lat, base_lon = DISTRICT_COORDS.get(district, (20.0, 78.0))
+    lat = round(base_lat + random.uniform(-0.25, 0.25), 6)
+    lon = round(base_lon + random.uniform(-0.25, 0.25), 6)
     ptype      = random.choice(PROJECT_TYPES)
     start_date = rdate(datetime(2015, 1, 1), datetime(2023, 6, 1))
 

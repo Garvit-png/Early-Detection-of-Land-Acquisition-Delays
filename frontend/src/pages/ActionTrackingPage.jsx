@@ -236,7 +236,7 @@ export default function ActionTrackingPage() {
                           </td>
                           <td>
                             {a.status !== 'completed' && a.status !== 'overridden' && (
-                              <div style={{ display:'flex', gap:4' }}>
+                              <div style={{ display:'flex', gap:4 }}>
                                 {a.status === 'open' && (
                                   <button className="btn btn-ghost btn-xs" title="Start" onClick={() => handleStart(a.id)}>Start</button>
                                 )}

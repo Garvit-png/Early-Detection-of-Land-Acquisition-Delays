@@ -293,3 +293,74 @@ def retrain_model(
         data_source=metrics["data_source"],
         message=f"Model retrained successfully on {metrics['train_rows']} rows from {metrics['data_source']}. Live predictor updated.",
     )
+
+
+# ─── Stage-wise prediction ────────────────────────────────────────────────────
+
+@router.get("/stage/{project_id}")
+def predict_stage_wise(
+    project_id: str,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+):
+    """
+    Run dedicated stage-wise ML prediction for a project.
+    Returns delay probability + risk score + top drivers + corrective action
+    for each of the 6 acquisition stages.
+
+    Uses the 6 separately trained XGBoost stage models.
+    """
+    from app.ml.stage_model import stage_predictor
+    from app.ml.stage_model import train_stage_models
+    import os
+
+    project = db.query(Project).filter(Project.project_id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # RBAC
+    if current_user.role == UserRole.DISTRICT and (
+        project.district != current_user.district or project.state != current_user.state
+    ):
+        raise HTTPException(status_code=403, detail="Access denied")
+    if current_user.role == UserRole.STATE and project.state != current_user.state:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Auto-train stage models if not present
+    stage_predictor.load()
+    if not stage_predictor._loaded:
+        try:
+            train_stage_models()
+            stage_predictor._loaded = False
+            stage_predictor.load()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Stage models not ready: {e}")
+
+    features = _project_to_features(project)
+    # Add extra stage-model features not in main model
+    features["funding_readiness"]       = getattr(project, "funding_readiness", None) or 75
+    features["notice_delivery_pct"]     = getattr(project, "notice_delivery_pct", None) or 75
+    features["mutation_completion_pct"] = getattr(project, "mutation_completion_pct", None) or 0
+    features["noc_pending_count"]       = project.noc_pending_count or 0
+
+    stage_results = stage_predictor.predict_all_stages(features)
+
+    return {
+        "project_id":      project_id,
+        "current_stage":   project.current_stage,
+        "current_stage_index": project.current_stage_index,
+        "stage_predictions": stage_results,
+        "model_metrics":   stage_predictor.metrics,
+    }
+
+
+@router.get("/stage-models/status")
+def stage_model_status(current_user: CurrentUser):
+    """Return training metrics for all 6 stage models."""
+    from app.ml.stage_model import stage_predictor
+    stage_predictor.load()
+    return {
+        "loaded":  stage_predictor._loaded,
+        "n_models": len(stage_predictor.models),
+        "metrics": stage_predictor.metrics,
+    }

@@ -73,3 +73,13 @@ export const getActionCounts   = ()                => api.get('/actions/counts/s
 
 // ─── AI Explanation (OpenAI + RAG) ────────────────────────────────────────────
 export const getExplanation = (projectId) => api.post(`/explain/${projectId}`)
+
+// ─── MIS Export ───────────────────────────────────────────────────────────────
+export const exportCSV = (params = {}) => api.get('/dashboard/export/csv', {
+  params,
+  responseType: 'blob',
+})
+
+// ─── Stage-wise prediction ────────────────────────────────────────────────────
+export const getStageWisePrediction = (projectId) => api.get(`/predictions/stage/${projectId}`)
+export const getStageModelsStatus   = ()           => api.get('/predictions/stage-models/status')

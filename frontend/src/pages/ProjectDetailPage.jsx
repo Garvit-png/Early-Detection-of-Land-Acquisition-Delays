@@ -7,7 +7,7 @@ import {
 import {
   getProject, scoreProject, updateProject,
   getRiskHistory, getSimilarProjects, getProjectActions,
-  createAction, updateAction, getExplanation,
+  createAction, updateAction, getExplanation, getStageWisePrediction,
 } from '../services/api'
 import { Icon } from '../components/shared/Icons'
 
@@ -491,8 +491,10 @@ export default function ProjectDetailPage() {
   const [scoring,  setScoring]  = useState(false)
   const [tab,      setTab]      = useState('overview')
   const [showEdit, setShowEdit] = useState(false)
-  const [explanation, setExplanation] = useState(null)
-  const [explaining,  setExplaining]  = useState(false)
+  const [explanation,  setExplanation]  = useState(null)
+  const [explaining,   setExplaining]   = useState(false)
+  const [stageData,    setStageData]    = useState(null)
+  const [loadingStage, setLoadingStage] = useState(false)
 
   const user = JSON.parse(localStorage.getItem('user') || '{}')
 
@@ -527,6 +529,16 @@ export default function ProjectDetailPage() {
     } catch(e) {
       setExplanation({ error: e.response?.data?.detail || e.message })
     } finally { setExplaining(false) }
+  }
+
+  async function handleStageWise() {
+    setLoadingStage(true)
+    try {
+      const r = await getStageWisePrediction(id)
+      setStageData(r.data)
+    } catch(e) {
+      console.error('Stage prediction failed:', e)
+    } finally { setLoadingStage(false) }
   }
 
   if (loading) return <div className="spinner-wrap"><div className="spinner" /></div>
@@ -749,10 +761,71 @@ export default function ProjectDetailPage() {
       {tab === 'overview' && (
         <div style={{ display:'grid', gridTemplateColumns:'1fr 360px', gap:20 }}>
           <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
-            {/* Stage timeline */}
+            {/* Stage timeline + stage-wise ML */}
             <div className="card">
-              <div className="detail-section-title">Lifecycle Stage Analysis</div>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                <div className="detail-section-title" style={{ margin:0 }}>Lifecycle Stage Analysis</div>
+                <button className="btn btn-outline btn-sm" onClick={handleStageWise} disabled={loadingStage}>
+                  {loadingStage ? 'Running…' : 'Run Stage ML'}
+                </button>
+              </div>
               <StageTimeline project={project} />
+
+              {stageData && (
+                <div style={{ marginTop:20 }}>
+                  <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em', color:'var(--gray-500)', marginBottom:10 }}>
+                    Dedicated Stage-Wise ML Predictions
+                  </div>
+                  {stageData.stage_predictions.map((s, i) => {
+                    const isCurrent = s.stage_index === (project.current_stage_index ?? 0)
+                    const barColor  = !s.risk_score ? 'var(--gray-200)'
+                      : s.risk_score >= 70 ? 'var(--danger)'
+                      : s.risk_score >= 40 ? 'var(--warning)'
+                      : 'var(--success)'
+                    return (
+                      <div key={i} style={{
+                        padding:'10px 12px', marginBottom:6, borderRadius:'var(--radius)',
+                        background: isCurrent ? 'var(--primary-light)' : 'var(--gray-50)',
+                        border: `1px solid ${isCurrent ? 'var(--primary)' : 'var(--gray-200)'}`,
+                      }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:220 }}>
+                            <div style={{ width:20, height:20, borderRadius:'50%', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
+                              background: isCurrent ? 'var(--primary)' : 'var(--gray-300)', color:'#fff', fontSize:9, fontWeight:700 }}>
+                              {s.stage_index + 1}
+                            </div>
+                            <span style={{ fontSize:12, fontWeight: isCurrent ? 700 : 500, color: isCurrent ? 'var(--primary)' : 'var(--gray-700)' }}>
+                              {s.stage_name}
+                              {isCurrent && <span style={{ marginLeft:6, fontSize:9, background:'var(--primary)', color:'#fff', padding:'1px 5px', borderRadius:3 }}>CURRENT</span>}
+                            </span>
+                          </div>
+                          {s.risk_score != null ? (
+                            <div style={{ display:'flex', alignItems:'center', gap:10, flex:1 }}>
+                              <div className="progress-wrap" style={{ flex:1, maxWidth:120 }}>
+                                <div className="progress-bar" style={{ width:`${s.risk_score}%`, background:barColor }} />
+                              </div>
+                              <span style={{ fontSize:13, fontWeight:700, color:barColor, minWidth:34 }}>{s.risk_score}</span>
+                              <span className={`risk-badge ${s.risk_category}`} style={{ fontSize:10 }}>
+                                <span className={`risk-dot ${s.risk_category}`} />{s.risk_category}
+                              </span>
+                              <span style={{ fontSize:11, color:'var(--gray-500)', minWidth:48 }}>
+                                {(s.delay_probability * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize:11, color:'var(--gray-400)' }}>Insufficient data</span>
+                          )}
+                        </div>
+                        {s.corrective_action && s.risk_score >= 40 && (
+                          <div style={{ marginTop:6, fontSize:11, color:'var(--gray-600)', paddingLeft:28 }}>
+                            {s.corrective_action}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
             {/* SHAP */}
             {shap.length > 0 && (

@@ -186,3 +186,70 @@ def get_state_analytics(current_user: CurrentUser, db: Session = Depends(get_db)
 
     result.sort(key=lambda x: x["avg_risk_score"], reverse=True)
     return result
+
+
+# ─── MIS CSV Export ──────────────────────────────────────────────────────────
+import csv, io
+from fastapi.responses import StreamingResponse
+from typing import Optional
+from fastapi import Query
+
+@router.get("/export/csv")
+def export_projects_csv(
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+    risk_category: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+):
+    """
+    MIS export — returns all projects (scoped by role) as a downloadable CSV.
+    Optional filters: risk_category, state.
+    """
+    query = db.query(Project)
+    if current_user.role == UserRole.DISTRICT:
+        query = query.filter(Project.state == current_user.state, Project.district == current_user.district)
+    elif current_user.role == UserRole.STATE:
+        query = query.filter(Project.state == current_user.state)
+
+    if risk_category:
+        try:
+            query = query.filter(Project.risk_category == RiskCategory(risk_category))
+        except ValueError:
+            pass
+    if state:
+        query = query.filter(Project.state == state)
+
+    projects = query.order_by(Project.risk_score.desc().nullslast()).all()
+
+    COLS = [
+        "project_id", "project_name", "project_type", "state", "district",
+        "current_stage", "risk_score", "risk_category", "delay_probability",
+        "expected_delay_label", "compensation_pct", "rr_completion_pct",
+        "documentation_pct", "stakeholder_response_pct", "possession_pct",
+        "funding_readiness", "notice_delivery_pct", "mutation_completion_pct",
+        "has_legal_dispute", "num_legal_cases", "ownership_conflicts",
+        "pending_approvals", "budget_released", "officer_responsiveness",
+        "families_affected", "land_area_ha", "land_cost_cr", "amount_paid_cr",
+        "days_since_last_action", "days_since_update", "is_delayed",
+        "last_scored_at", "start_date",
+    ]
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(COLS)
+    for p in projects:
+        row = []
+        for col in COLS:
+            val = getattr(p, col, None)
+            if hasattr(val, "value"):   # enum
+                val = val.value
+            row.append(val if val is not None else "")
+        writer.writerow(row)
+
+    buf.seek(0)
+    filename = f"land_acquisition_MIS_{current_user.role}_{current_user.username}.csv"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

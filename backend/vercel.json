@@ -1,0 +1,12 @@
+{
+  "buildCommand": "pip install -r requirements.txt",
+  "outputDirectory": ".",
+  "devCommand": "uvicorn app.main:app --reload",
+  "installCommand": "pip install -r requirements.txt",
+  "framework": "fastapi",
+  "functions": {
+    "app/main.py": {
+      "maxDuration": 30
+    }
+  }
+}

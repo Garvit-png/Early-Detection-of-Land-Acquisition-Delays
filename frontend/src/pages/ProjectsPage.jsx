@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getProjects, scoreProject } from '../services/api'
+import { getProjects, scoreProject, exportCSV } from '../services/api'
 import { Icon } from '../components/shared/Icons'
 
 const STAGES = [
@@ -39,6 +39,25 @@ export default function ProjectsPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [scoringId, setScoringId] = useState(null)
+  const [exporting, setExporting]  = useState(false)
+
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const params = {}
+      if (riskFilter)  params.risk_category = riskFilter
+      if (searchParams.get('state')) params.state = searchParams.get('state')
+      const r = await exportCSV(params)
+      const url  = URL.createObjectURL(new Blob([r.data], { type: 'text/csv' }))
+      const link = document.createElement('a')
+      link.href  = url
+      link.download = `land_acquisition_MIS_${new Date().toISOString().slice(0,10)}.csv`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch(e) {
+      alert('Export failed: ' + e.message)
+    } finally { setExporting(false) }
+  }
 
   const page          = parseInt(searchParams.get('page') || '1')
   const riskFilter    = searchParams.get('risk_category') || ''
@@ -96,9 +115,14 @@ export default function ProjectsPage() {
           <h1 className="page-title">Projects</h1>
           {data && <div className="page-subtitle">{data.total.toLocaleString()} projects found</div>}
         </div>
-        <button className="btn btn-primary" onClick={() => navigate('/projects/new')}>
-          <Icon.Lightning /> Submit New Project
-        </button>
+        <div style={{ display:'flex', gap:8 }}>
+          <button className="btn btn-outline" onClick={handleExport} disabled={exporting}>
+            {exporting ? 'Exporting…' : 'Export CSV'}
+          </button>
+          <button className="btn btn-primary" onClick={() => navigate('/projects/new')}>
+            <Icon.Lightning /> Submit New Project
+          </button>
+        </div>
       </div>
 
       {/* Filter bar */}
