@@ -1,8 +1,11 @@
 # Exclude heavy files from Vercel bundle
 data/
-backend/data/raw/
-backend/data/processed/
-backend/__pycache__/
+raw/
+processed/
+models/
+*.pkl
+*.joblib
+__pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
@@ -17,3 +20,4 @@ uvicorn.log
 *.md
 scripts/
 tests/
+*.ipynb
