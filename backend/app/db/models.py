@@ -25,6 +25,14 @@ class RiskCategory(str, enum.Enum):
     HIGH   = "High"
 
 
+# SQLAlchemy Enum types that map to the existing Postgres enums created by schema.sql
+# values_callable ensures we send the .value ("central") not .name ("CENTRAL")
+_pg_user_role     = SAEnum(UserRole,     name="user_role",     create_type=False,
+                           values_callable=lambda x: [e.value for e in x])
+_pg_risk_category = SAEnum(RiskCategory, name="risk_category", create_type=False,
+                           values_callable=lambda x: [e.value for e in x])
+
+
 class AcquisitionStage(str, enum.Enum):
     SECTION_11        = "Section 11 Notification"
     SECTION_19        = "Section 19 Declaration"
@@ -44,7 +52,7 @@ class User(Base):
     email         = Column(String(128), unique=True, nullable=False)
     hashed_password = Column(String(256), nullable=False)
     full_name     = Column(String(128))
-    role          = Column(SAEnum(UserRole), nullable=False, default=UserRole.DISTRICT)
+    role          = Column(_pg_user_role, nullable=False, default=UserRole.DISTRICT)
     state         = Column(String(64))     # null for central users
     district      = Column(String(64))     # null for central/state users
     is_active     = Column(Boolean, default=True)
@@ -107,7 +115,7 @@ class Project(Base):
     # ML outputs (updated periodically)
     delay_probability             = Column(Float, nullable=True)
     risk_score                    = Column(Float, nullable=True)
-    risk_category                 = Column(SAEnum(RiskCategory), nullable=True)
+    risk_category                 = Column(_pg_risk_category, nullable=True)
     top_delay_reasons             = Column(JSON, nullable=True)
     shap_factors                  = Column(JSON, nullable=True)
     recommendations               = Column(JSON, nullable=True)
@@ -136,7 +144,7 @@ class Alert(Base):
     project_id_fk   = Column(Integer, ForeignKey("projects.id"), nullable=False)
     title           = Column(String(256), nullable=False)
     message         = Column(Text, nullable=False)
-    risk_category   = Column(SAEnum(RiskCategory), nullable=False)
+    risk_category   = Column(_pg_risk_category, nullable=False)
     risk_score      = Column(Float)
     is_read         = Column(Boolean, default=False)
     is_resolved     = Column(Boolean, default=False)
@@ -176,7 +184,7 @@ class RiskHistory(Base):
     project_id_fk    = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     risk_score       = Column(Float, nullable=False)
     delay_probability = Column(Float, nullable=False)
-    risk_category    = Column(SAEnum(RiskCategory), nullable=False)
+    risk_category    = Column(_pg_risk_category, nullable=False)
     rules_triggered  = Column(JSON, nullable=True)
     scored_by        = Column(Integer, ForeignKey("users.id"), nullable=True)   # null = system
     trigger          = Column(String(32), default="manual")                     # manual | update | batch | submit
@@ -196,6 +204,9 @@ class ActionStatus(str, enum.Enum):
     COMPLETED  = "completed"
     OVERRIDDEN = "overridden"
 
+_pg_action_status = SAEnum(ActionStatus, name="actionstatus", create_type=True,
+                           values_callable=lambda x: [e.value for e in x])
+
 
 class ActionItem(Base):
     __tablename__ = "action_items"
@@ -213,7 +224,7 @@ class ActionItem(Base):
     assigned_to    = Column(Integer, ForeignKey("users.id"), nullable=True)
     assigned_by    = Column(Integer, ForeignKey("users.id"), nullable=True)
     # Status tracking
-    status         = Column(SAEnum(ActionStatus), default=ActionStatus.OPEN, index=True)
+    status         = Column(_pg_action_status, default=ActionStatus.OPEN, index=True)
     priority       = Column(String(8), default="medium")      # low | medium | high | critical
     due_date       = Column(DateTime, nullable=True)
     completed_at   = Column(DateTime, nullable=True)

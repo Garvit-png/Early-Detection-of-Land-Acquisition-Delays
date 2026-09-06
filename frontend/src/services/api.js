@@ -1,6 +1,13 @@
 import axios from 'axios'
 
-const api = axios.create({ baseURL: '/api' })
+// In production (Vercel), set VITE_API_URL to your backend Vercel URL
+// e.g. https://your-backend.vercel.app
+// In local dev, leave it unset — Vite proxy will handle /api → localhost:8000
+const BASE_URL = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api'
+
+const api = axios.create({ baseURL: BASE_URL })
 
 // Attach token to every request
 api.interceptors.request.use(cfg => {
