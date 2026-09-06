@@ -14,7 +14,21 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "../.."))
-MODEL_FILE   = os.path.join(PROJECT_ROOT, "data/models/xgb_delay_model.json")
+
+def _find_model_file() -> str:
+    """Find model file across different deployment environments."""
+    candidates = [
+        "/app/data/models/xgb_delay_model.json",                          # Railway
+        os.path.join(BASE_DIR, "../../data/models/xgb_delay_model.json"), # Railway relative
+        os.path.join(PROJECT_ROOT, "data/models/xgb_delay_model.json"),   # Local/other
+        os.path.join(PROJECT_ROOT, "backend/data/models/xgb_delay_model.json"),
+    ]
+    for path in candidates:
+        if os.path.exists(os.path.abspath(path)):
+            return os.path.abspath(path)
+    return candidates[0]  # fallback
+
+MODEL_FILE = _find_model_file()
 
 
 @asynccontextmanager
