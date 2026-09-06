@@ -48,15 +48,16 @@ MODELS_DIR = get_models_dir()
 def get_csv_path() -> str:
     """Get training CSV path — works locally and on Railway."""
     candidates = [
+        # Railway: /app is backend root, CSV is at /app/../data/processed/
+        "/app/data/processed/projects_ml.csv",
         os.path.join(BASE_DIR, "../../../data/processed/projects_ml.csv"),
         os.path.join(PROJECT_ROOT, "data/processed/projects_ml.csv"),
-        os.path.join(PROJECT_ROOT, "backend/../data/processed/projects_ml.csv"),
     ]
     for path in candidates:
         resolved = os.path.abspath(path)
         if os.path.exists(resolved):
             return resolved
-    return os.path.abspath(candidates[0])
+    return os.path.abspath(candidates[1])
 
 
 CSV_FALLBACK = get_csv_path()
