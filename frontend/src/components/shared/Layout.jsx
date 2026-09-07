@@ -48,14 +48,13 @@ export default function Layout() {
         {/* Brand */}
         <div className="sidebar-brand">
           <div className="sidebar-brand-logo">
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-              <rect width="28" height="28" rx="6" fill="rgba(255,255,255,.15)"/>
-              <path d="M6 22V14l8-6 8 6v8H6z" stroke="rgba(255,255,255,.9)" strokeWidth="1.5" fill="none"/>
-              <rect x="11" y="16" width="6" height="6" fill="rgba(255,255,255,.6)"/>
-            </svg>
-            <div className="sidebar-brand-name">Land Acquisition<br />Delay Predictor</div>
+            <img src="/logo_bhoomi.png" alt="Bhoomi Logo"
+              style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'contain' }} />
+            <div>
+              <div className="sidebar-brand-name">Bhoomi Nivaran</div>
+              <div className="sidebar-brand-sub">DoLR — Ministry of Rural Dev.</div>
+            </div>
           </div>
-          <div className="sidebar-brand-sub">Ministry of Rural Development — DoLR</div>
         </div>
 
         {/* Navigation */}
@@ -91,8 +90,18 @@ export default function Layout() {
 
         {/* Footer */}
         <div className="sidebar-footer">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: '50%',
+              background: 'var(--primary-light)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)' }}>
+                {user?.username?.[0]?.toUpperCase()}
+              </span>
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
               <div className="sidebar-user-name">{user?.username}</div>
               <div className="sidebar-user-role">{roleLabel}</div>
             </div>
@@ -102,16 +111,16 @@ export default function Layout() {
               style={{
                 flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 28, height: 28,
-                border: '1px solid rgba(255,255,255,.2)',
+                width: 30, height: 30,
+                border: '1px solid var(--gray-200)',
                 borderRadius: 'var(--radius)',
                 background: 'transparent',
-                color: 'rgba(255,255,255,.6)',
+                color: 'var(--gray-400)',
                 cursor: 'pointer',
                 transition: 'background .15s, color .15s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,.1)'; e.currentTarget.style.color = '#fff' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,.6)' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--gray-100)'; e.currentTarget.style.color = 'var(--gray-700)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--gray-400)' }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -132,7 +141,7 @@ export default function Layout() {
             <div className="topbar-role-tag">
               <span style={{
                 display: 'inline-block', width: 7, height: 7,
-                borderRadius: '50%', background: 'var(--accent)', flexShrink: 0
+                borderRadius: '50%', background: 'var(--success)', flexShrink: 0
               }} />
               {roleLabel}
             </div>

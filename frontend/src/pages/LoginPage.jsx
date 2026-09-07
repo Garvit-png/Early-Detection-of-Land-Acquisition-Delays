@@ -26,7 +26,7 @@ export default function LoginPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'var(--gray-50)',
+      background: '#f0fdf4',
       backgroundImage: 'url("/highway_bhoomi.avif")',
       backgroundSize: 'cover',
       backgroundPosition: 'center',
@@ -38,12 +38,17 @@ export default function LoginPage() {
       position: 'relative',
     }}>
       <div style={{
+        position: 'absolute', inset: 0,
+        background: 'rgba(15, 23, 42, 0.45)',
+      }} />
+      <div style={{
         position: 'absolute',
-        top: 24,
+        top: 20,
         left: 24,
         display: 'flex',
         alignItems: 'center',
         gap: 8,
+        zIndex: 10,
       }}>
         <img src="/logo_bhoomi.png" alt="Bhoomi Logo"
              style={{
@@ -54,10 +59,11 @@ export default function LoginPage() {
                display: 'block',
              }} />
         <span style={{
-          color: '#000',
+          color: '#fff',
           fontSize: 16,
           fontWeight: 600,
           letterSpacing: '0.2px',
+          textShadow: '0 1px 4px rgba(0,0,0,.3)',
         }}>
           Bhoomi Nivaran
         </span>
@@ -67,9 +73,11 @@ export default function LoginPage() {
         maxWidth: 900,
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
-        borderRadius: 14,
+        borderRadius: 20,
         overflow: 'hidden',
-        boxShadow: '0 8px 32px rgba(0,0,0,.14)',
+        boxShadow: '0 24px 64px rgba(0,0,0,.25)',
+        position: 'relative',
+        zIndex: 1,
       }}>
 
         {/* ── Left: branding panel ── */}
@@ -133,7 +141,7 @@ export default function LoginPage() {
                 onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
             </div>
             <button className="btn btn-primary"
-              style={{ width: '100%', justifyContent: 'center', padding: '10px', fontSize: 14, marginTop: 4 }}
+              style={{ width: '100%', justifyContent: 'center', padding: '11px', fontSize: 14, marginTop: 4, borderRadius: 10 }}
               type="submit" disabled={loading}>
               {loading ? 'Authenticating…' : 'Sign In'}
             </button>
