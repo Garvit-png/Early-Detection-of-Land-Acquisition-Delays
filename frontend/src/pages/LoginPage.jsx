@@ -75,19 +75,8 @@ export default function LoginPage() {
         {/* ── Left: branding panel ── */}
         <div style={{
           background: '#fff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '32px',
           overflow: 'hidden',
         }}>
-          <div style={{
-            width: '100%',
-            height: '100%',
-            borderRadius: 20,
-            overflow: 'hidden',
-            boxShadow: '0 8px 24px rgba(0,0,0,.15)',
-          }}>
             <img src="/bhoomi_nivaran_signin.jpeg" alt="Nivaran Illustration"
                  style={{
                    width: '100%',
@@ -95,7 +84,6 @@ export default function LoginPage() {
                    objectFit: 'cover',
                    display: 'block',
                  }} />
-          </div>
         </div>
 
         {/* ── Right: form panel ── */}
