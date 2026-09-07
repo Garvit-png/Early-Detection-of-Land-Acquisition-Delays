@@ -27,11 +27,40 @@ export default function LoginPage() {
     <div style={{
       minHeight: '100vh',
       background: 'var(--gray-50)',
+      backgroundImage: 'url("/highway_bhoomi.avif")',
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       padding: '24px',
+      position: 'relative',
     }}>
+      <div style={{
+        position: 'absolute',
+        top: 24,
+        left: 24,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+      }}>
+        <img src="/logo_bhoomi.png" alt="Bhoomi Logo"
+             style={{
+               width: 80,
+               height: 80,
+               borderRadius: 12,
+               objectFit: 'contain',
+             }} />
+        <span style={{
+          color: '#000',
+          fontSize: 18,
+          fontWeight: 600,
+          letterSpacing: '0.2px',
+        }}>
+          Bhoomi Nivaran
+        </span>
+      </div>
       <div style={{
         width: '100%',
         maxWidth: 900,
@@ -44,93 +73,27 @@ export default function LoginPage() {
 
         {/* ── Left: branding panel ── */}
         <div style={{
-          background: 'var(--primary)',
-          padding: '48px 40px',
+          background: '#fff',
           display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          position: 'relative',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '32px',
           overflow: 'hidden',
         }}>
-          {/* background circle decoration */}
           <div style={{
-            position: 'absolute', width: 260, height: 260, borderRadius: '50%',
-            background: 'rgba(255,255,255,.05)',
-            bottom: -60, right: -60, pointerEvents: 'none',
-          }} />
-
-          {/* top: org header */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32 }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 8,
-                background: 'rgba(255,255,255,.15)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="1.8">
-                  <line x1="3" y1="22" x2="21" y2="22"/>
-                  <line x1="6" y1="18" x2="6" y2="11"/>
-                  <line x1="10" y1="18" x2="10" y2="11"/>
-                  <line x1="14" y1="18" x2="14" y2="11"/>
-                  <line x1="18" y1="18" x2="18" y2="11"/>
-                  <polygon points="12,2 20,7 4,7"/>
-                </svg>
-              </div>
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.5)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
-                  Government of India
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,.85)' }}>
-                  Ministry of Rural Development
-                </div>
-              </div>
-            </div>
-
-            <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', lineHeight: 1.25, marginBottom: 14 }}>
-              Land Acquisition<br />Delay Predictor
-            </div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)', lineHeight: 1.65, maxWidth: 300 }}>
-              AI-powered early warning system for monitoring land acquisition projects and predicting delays before they occur.
-            </div>
-          </div>
-
-          {/* middle: feature list */}
-          <div style={{ margin: '32px 0' }}>
-            {[
-              'Real-time risk scoring for every project',
-              'SHAP-based explainable AI analysis',
-              'GIS map with district-level visibility',
-              'Role-based access across Central, State & District',
-            ].map((f, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
-                <div style={{
-                  width: 18, height: 18, borderRadius: '50%', flexShrink: 0, marginTop: 1,
-                  background: 'rgba(255,255,255,.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.8)" strokeWidth="3">
-                    <polyline points="20,6 9,17 4,12"/>
-                  </svg>
-                </div>
-                <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,.7)', lineHeight: 1.5 }}>{f}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* bottom: badge */}
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 7,
-            padding: '7px 12px',
-            background: 'rgba(255,255,255,.1)',
-            border: '1px solid rgba(255,255,255,.15)',
-            borderRadius: 6,
-            fontSize: 11.5, color: 'rgba(255,255,255,.7)', fontWeight: 500,
-            alignSelf: 'flex-start',
+            width: '100%',
+            height: '100%',
+            borderRadius: 20,
+            overflow: 'hidden',
+            boxShadow: '0 8px 24px rgba(0,0,0,.15)',
           }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-            Dept of Land Resources (DoLR) — SIH 2026
+            <img src="/login_nivaran.avif" alt="Nivaran Illustration"
+                 style={{
+                   width: '100%',
+                   height: '100%',
+                   objectFit: 'cover',
+                   display: 'block',
+                 }} />
           </div>
         </div>
 
