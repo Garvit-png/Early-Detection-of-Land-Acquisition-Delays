@@ -48,9 +48,11 @@ export default function LoginPage() {
         <img src="/logo_bhoomi.png" alt="Bhoomi Logo"
              style={{
                width: 80,
-               height: 80,
+               height: 'auto',
+               maxHeight: 90,
                borderRadius: 12,
                objectFit: 'contain',
+               display: 'block',
              }} />
         <span style={{
           color: '#000',
