@@ -94,26 +94,20 @@ export default function LoginPage() {
             Delays
           </h1>
 
-          <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, lineHeight: 1.75, maxWidth: 300 }}>
+          <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, lineHeight: 1.75, maxWidth: 300, marginBottom: 24 }}>
             Predictive risk scoring across all states, powered by XGBoost + SHAP explainability for transparent decisions.
           </p>
 
-          {/* Divider */}
-          <div style={{ height: 1, background: 'rgba(255,255,255,.08)', margin: '28px 0' }} />
-
-          {/* Feature list */}
-          {[
-            ['📊', 'Real-time risk scoring across 5000+ projects'],
-            ['🗺️', 'GIS map view with state-wise analytics'],
-            ['🤖', 'AI recommendations with audit trail'],
-          ].map(([icon, text]) => (
-            <div key={text} style={{
-              display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14,
-            }}>
-              <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>{icon}</span>
-              <span style={{ color: 'rgba(255,255,255,.6)', fontSize: 12.5, lineHeight: 1.5 }}>{text}</span>
-            </div>
-          ))}
+          {/* Image */}
+          <div style={{
+            borderRadius: 16,
+            overflow: 'hidden',
+            boxShadow: '0 8px 32px rgba(0,0,0,.3)',
+            maxHeight: 220,
+          }}>
+            <img src="/new_single.png" alt="Land Acquisition"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          </div>
         </div>
 
         {/* ── Bottom footer ── */}
