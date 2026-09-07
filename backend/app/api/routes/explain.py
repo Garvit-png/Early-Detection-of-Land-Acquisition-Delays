@@ -1,79 +1,49 @@
 """
-explain.py — AI Explanation endpoint.
+explain.py — AI Explanation endpoints.
 
-POST /api/explain/{project_id}
-  → fetches project + its latest ML scores from DB
-  → retrieves relevant RAG chunks from the 4 SIH knowledge-base MD files
-  → calls OpenAI GPT-4o-mini with grounded context
-  → returns structured explanation: WHY / ACTIONS / LEGAL BASIS + source citations
+POST /api/explain/{project_id}              — original: WHY / ACTIONS / LEGAL BASIS
+POST /api/explain/{project_id}/stage-wise   — per-stage recommendations (all 6 stages)
+POST /api/explain/{project_id}/overall      — comprehensive overall recommendation
 
-Falls back to rule-based text if OPENAI_API_KEY is not set.
+All endpoints accept an optional X-OpenAI-Key header so the frontend
+can supply its own API key in test mode (overrides the env var).
 """
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
+from typing import Optional
 
 from app.core.deps import CurrentUser, get_db, log_action
 from app.db.models import Project, UserRole
-from app.services.openai_service import explain_project
+from app.services.openai_service import explain_project, explain_stage_wise, explain_overall
 
 router = APIRouter(prefix="/explain", tags=["AI Explanation"])
 
 
-@router.post("/{project_id}")
-def get_explanation(
-    project_id: str,
-    request: Request,
-    current_user: CurrentUser,
-    db: Session = Depends(get_db),
-):
-    """
-    Generate an AI-grounded explanation for a project's risk score.
+# ─── Shared helpers ───────────────────────────────────────────────────────────
 
-    Uses:
-      - XGBoost SHAP factors (already stored on the project row)
-      - Triggered rules R-01..R-08
-      - RAG retrieval from SIH_Legal_Audit_Knowledge_Base.md,
-        SIH_Stage_Admin_Knowledge_Base.md, SIH_Recommendation_Rules.md,
-        SIH_Feature_Mapping.md
-      - GPT-4o-mini to synthesize a natural-language explanation
-        with LARR Act + CAG audit citations
-
-    Returns:
-      {
-        project_id, risk_score, risk_category,
-        why:          str  — why this risk score, citing KB records
-        actions:      str  — 2-4 prioritized actions with rule IDs
-        legal_basis:  str  — LARR/CAG grounding for top risk driver
-        full_text:    str  — complete GPT response
-        sources:      list — KB record IDs cited (e.g. ["R-01","CAG-02"])
-        model_used:   str  — "gpt-4o-mini" or "rule-based-fallback"
-        kb_chunks_used: int
-        generated_at: str
-      }
-    """
+def _get_project_or_404(project_id: str, current_user, db: Session) -> Project:
     project = db.query(Project).filter(Project.project_id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-
-    # RBAC
     if current_user.role == UserRole.DISTRICT and (
         project.district != current_user.district or project.state != current_user.state
     ):
         raise HTTPException(status_code=403, detail="Access denied")
     if current_user.role == UserRole.STATE and project.state != current_user.state:
         raise HTTPException(status_code=403, detail="Access denied")
-
     if project.risk_score is None:
         raise HTTPException(
             status_code=400,
             detail="Project has not been scored yet. Run /api/predictions/{project_id} first.",
         )
+    return project
 
-    # Build project_data dict for the OpenAI service
-    project_data = {
+
+def _build_project_data(project: Project) -> dict:
+    return {
         "project_id":               project.project_id,
         "project_name":             project.project_name,
         "project_type":             project.project_type,
@@ -96,16 +66,27 @@ def get_explanation(
         "compensation_pending_months": project.compensation_pending_months,
         "families_affected":        project.families_affected,
         "land_area_ha":             project.land_area_ha,
-        # New FM-12/13/14 features
         "funding_readiness":        getattr(project, "funding_readiness",        None),
         "notice_delivery_pct":      getattr(project, "notice_delivery_pct",      None),
         "mutation_completion_pct":  getattr(project, "mutation_completion_pct",  None),
     }
 
+
+# ─── Original explain endpoint ────────────────────────────────────────────────
+
+@router.post("/{project_id}")
+def get_explanation(
+    project_id: str,
+    request: Request,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+    x_openai_key: Optional[str] = Header(default=None, alias="X-OpenAI-Key"),
+):
+    project      = _get_project_or_404(project_id, current_user, db)
+    project_data = _build_project_data(project)
     shap_factors    = project.shap_factors    or []
     rules_triggered = project.rules_triggered or []
 
-    # ── Call OpenAI service (with RAG grounding) ──────────────────────────────
     result = explain_project(
         project_data         = project_data,
         shap_factors         = shap_factors,
@@ -115,11 +96,22 @@ def get_explanation(
         expected_delay_label = project.expected_delay_label,
     )
 
-    log_action(
-        db, current_user, "EXPLAIN_PROJECT", "project", project_id,
-        detail=f"model={result.get('model_used')},chunks={result.get('kb_chunks_used')}",
-        ip_address=request.client.host if request.client else None,
-    )
+    # If frontend supplied a key and env key was empty, retry with frontend key
+    if result.get("model_used") == "rule-based-fallback" and x_openai_key:
+        import os
+        old = os.environ.get("OPENAI_API_KEY", "")
+        os.environ["OPENAI_API_KEY"] = x_openai_key
+        result = explain_project(
+            project_data=project_data, shap_factors=shap_factors,
+            rules_triggered=rules_triggered, risk_score=project.risk_score,
+            risk_category=project.risk_category.value if project.risk_category else "Medium",
+            expected_delay_label=project.expected_delay_label,
+        )
+        os.environ["OPENAI_API_KEY"] = old
+
+    log_action(db, current_user, "EXPLAIN_PROJECT", "project", project_id,
+               detail=f"model={result.get('model_used')},chunks={result.get('kb_chunks_used')}",
+               ip_address=request.client.host if request.client else None)
 
     return {
         "project_id":      project_id,
@@ -136,4 +128,117 @@ def get_explanation(
         "kb_chunks_used":  result.get("kb_chunks_used", 0),
         "tokens_used":     result.get("tokens_used", 0),
         "generated_at":    datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# ─── Per-stage recommendations ────────────────────────────────────────────────
+
+@router.post("/{project_id}/stage-wise")
+def get_stage_wise_explanation(
+    project_id: str,
+    request: Request,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+    x_openai_key: Optional[str] = Header(default=None, alias="X-OpenAI-Key"),
+):
+    """
+    Generate per-stage recommendations for all 6 acquisition stages.
+    Pass X-OpenAI-Key header to use a custom API key (test mode).
+
+    Returns:
+      {
+        project_id, project_name, risk_score, current_stage,
+        stage_recommendations: [
+          { stage_name, stage_index, relation (past/current/future),
+            text, tokens_used, model_used }
+          ... x6
+        ],
+        model_used, total_tokens, generated_at
+      }
+    """
+    project         = _get_project_or_404(project_id, current_user, db)
+    project_data    = _build_project_data(project)
+    shap_factors    = project.shap_factors    or []
+    rules_triggered = project.rules_triggered or []
+
+    result = explain_stage_wise(
+        project_data    = project_data,
+        shap_factors    = shap_factors,
+        rules_triggered = rules_triggered,
+        risk_score      = project.risk_score,
+        risk_category   = project.risk_category.value if project.risk_category else "Medium",
+        api_key         = x_openai_key,
+    )
+
+    log_action(db, current_user, "EXPLAIN_STAGE_WISE", "project", project_id,
+               detail=f"model={result.get('model_used')},tokens={result.get('total_tokens')}",
+               ip_address=request.client.host if request.client else None)
+
+    return {
+        "project_id":            project_id,
+        "project_name":          project.project_name,
+        "risk_score":            project.risk_score,
+        "risk_category":         project.risk_category.value if project.risk_category else None,
+        "current_stage":         project.current_stage,
+        "stage_recommendations": result.get("stage_recommendations", []),
+        "model_used":            result.get("model_used", "rule-based-fallback"),
+        "total_tokens":          result.get("total_tokens", 0),
+        "generated_at":          datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# ─── Overall recommendations ──────────────────────────────────────────────────
+
+@router.post("/{project_id}/overall")
+def get_overall_explanation(
+    project_id: str,
+    request: Request,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+    x_openai_key: Optional[str] = Header(default=None, alias="X-OpenAI-Key"),
+):
+    """
+    Generate a comprehensive overall recommendation.
+    Pass X-OpenAI-Key header to use a custom API key (test mode).
+
+    Returns:
+      {
+        project_id, project_name, risk_score, risk_category,
+        summary, critical_actions, bottlenecks, outlook,
+        full_text, model_used, tokens_used, generated_at
+      }
+    """
+    project         = _get_project_or_404(project_id, current_user, db)
+    project_data    = _build_project_data(project)
+    shap_factors    = project.shap_factors    or []
+    rules_triggered = project.rules_triggered or []
+
+    result = explain_overall(
+        project_data         = project_data,
+        shap_factors         = shap_factors,
+        rules_triggered      = rules_triggered,
+        risk_score           = project.risk_score,
+        risk_category        = project.risk_category.value if project.risk_category else "Medium",
+        expected_delay_label = project.expected_delay_label,
+        api_key              = x_openai_key,
+    )
+
+    log_action(db, current_user, "EXPLAIN_OVERALL", "project", project_id,
+               detail=f"model={result.get('model_used')},tokens={result.get('tokens_used')}",
+               ip_address=request.client.host if request.client else None)
+
+    return {
+        "project_id":       project_id,
+        "project_name":     project.project_name,
+        "risk_score":       project.risk_score,
+        "risk_category":    project.risk_category.value if project.risk_category else None,
+        "rules_triggered":  rules_triggered,
+        "summary":          result.get("summary",          ""),
+        "critical_actions": result.get("critical_actions", ""),
+        "bottlenecks":      result.get("bottlenecks",      ""),
+        "outlook":          result.get("outlook",          ""),
+        "full_text":        result.get("full_text",        ""),
+        "model_used":       result.get("model_used",       "rule-based-fallback"),
+        "tokens_used":      result.get("tokens_used",      0),
+        "generated_at":     datetime.now(timezone.utc).isoformat(),
     }

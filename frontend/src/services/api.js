@@ -79,7 +79,18 @@ export const updateAction      = (id, data)        => api.patch(`/actions/${id}`
 export const getActionCounts   = ()                => api.get('/actions/counts/summary')
 
 // ─── AI Explanation (OpenAI + RAG) ────────────────────────────────────────────
-export const getExplanation = (projectId) => api.post(`/explain/${projectId}`)
+// apiKey is optional — if provided it is sent as X-OpenAI-Key header (test mode)
+const _explainHeaders = (apiKey) =>
+  apiKey ? { headers: { 'X-OpenAI-Key': apiKey } } : {}
+
+export const getExplanation      = (projectId, apiKey) =>
+  api.post(`/explain/${projectId}`, {}, _explainHeaders(apiKey))
+
+export const getStageWiseExplanation = (projectId, apiKey) =>
+  api.post(`/explain/${projectId}/stage-wise`, {}, _explainHeaders(apiKey))
+
+export const getOverallExplanation   = (projectId, apiKey) =>
+  api.post(`/explain/${projectId}/overall`, {}, _explainHeaders(apiKey))
 
 // ─── MIS Export ───────────────────────────────────────────────────────────────
 export const exportCSV = (params = {}) => api.get('/dashboard/export/csv', {

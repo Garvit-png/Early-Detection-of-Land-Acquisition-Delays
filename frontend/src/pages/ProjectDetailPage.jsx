@@ -8,6 +8,7 @@ import {
   getProject, scoreProject, updateProject,
   getRiskHistory, getSimilarProjects, getProjectActions,
   createAction, updateAction, getExplanation, getStageWisePrediction,
+  getStageWiseExplanation, getOverallExplanation,
 } from '../services/api'
 import { Icon } from '../components/shared/Icons'
 
@@ -66,6 +67,57 @@ function ProgressField({ label, value, threshold = 50 }) {
         <span style={{ fontSize:12, fontWeight:700, color:`var(--${color})` }}>{v}%</span>
       </div>
       <div className="progress-wrap"><div className={`progress-bar ${color}`} style={{ width:`${v}%` }} /></div>
+    </div>
+  )
+}
+
+// ─── AI Explanation helper components ─────────────────────────────────────────
+
+function LoadingCard({ text }) {
+  return (
+    <div className="card" style={{ padding:32, textAlign:'center' }}>
+      <div className="spinner" style={{ margin:'0 auto 12px' }} />
+      <div style={{ fontSize:13, color:'var(--gray-500)' }}>{text}</div>
+    </div>
+  )
+}
+
+function ErrorCard({ msg }) {
+  return (
+    <div className="card" style={{ padding:16, background:'var(--danger-light)', border:'1px solid var(--danger-border)' }}>
+      <div style={{ fontSize:13, fontWeight:700, color:'var(--danger)', marginBottom:4 }}>Request failed</div>
+      <div style={{ fontSize:12, color:'var(--danger)' }}>{msg}</div>
+    </div>
+  )
+}
+
+function ModelBadge({ model, tokens, chunks, tiny }) {
+  const isGpt = model === 'gpt-4o-mini'
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+      <span style={{
+        fontSize: tiny ? 9 : 10, fontWeight:700, padding: tiny ? '1px 5px' : '2px 8px',
+        borderRadius:3,
+        background: isGpt ? '#e0f2fe' : 'var(--gray-100)',
+        color: isGpt ? '#0369a1' : 'var(--gray-500)',
+        border: isGpt ? '1px solid #7dd3fc' : '1px solid var(--gray-200)',
+      }}>
+        {isGpt ? 'GPT-4o-mini' : 'Fallback'}
+      </span>
+      {!tiny && tokens > 0 && <span style={{ fontSize:10, color:'var(--gray-400)' }}>{tokens} tok</span>}
+      {!tiny && chunks > 0 && <span style={{ fontSize:10, color:'var(--gray-400)' }}>{chunks} chunks</span>}
+    </div>
+  )
+}
+
+function ExplainSection({ title, color, text, footer }) {
+  return (
+    <div style={{ marginBottom:14, paddingBottom:14, borderBottom:'1px solid var(--gray-100)' }}>
+      <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em', color: color || 'var(--gray-600)', marginBottom:6 }}>
+        {title}
+      </div>
+      <div style={{ fontSize:13, color:'var(--gray-700)', lineHeight:1.8, whiteSpace:'pre-wrap' }}>{text}</div>
+      {footer && <div style={{ marginTop:8, fontSize:11, color:'var(--gray-400)' }}>{footer}</div>}
     </div>
   )
 }
@@ -491,9 +543,17 @@ export default function ProjectDetailPage() {
   const [scoring,  setScoring]  = useState(false)
   const [tab,      setTab]      = useState('overview')
   const [showEdit, setShowEdit] = useState(false)
-  const [explanation,  setExplanation]  = useState(null)
-  const [explaining,   setExplaining]   = useState(false)
-  const [stageData,    setStageData]    = useState(null)
+  const [explanation,      setExplanation]      = useState(null)
+  const [explaining,       setExplaining]       = useState(false)
+  const [stageExplanation, setStageExplanation] = useState(null)
+  const [explainingStage,  setExplainingStage]  = useState(false)
+  const [overallExpl,      setOverallExpl]      = useState(null)
+  const [explainingOverall,setExplainingOverall]= useState(false)
+  const [stageData,        setStageData]        = useState(null)
+  // API key for test mode — stored in localStorage so it persists across reloads
+  const [apiKey,     setApiKey]     = useState(() => localStorage.getItem('openai_api_key') || '')
+  const [showApiKey, setShowApiKey] = useState(false)
+  const [apiKeyInput,setApiKeyInput]= useState(() => localStorage.getItem('openai_api_key') || '')
   const [loadingStage, setLoadingStage] = useState(false)
 
   const user = JSON.parse(localStorage.getItem('user') || '{}')
@@ -520,15 +580,48 @@ export default function ProjectDetailPage() {
     } finally { setScoring(false) }
   }
 
+  function saveApiKey() {
+    localStorage.setItem('openai_api_key', apiKeyInput)
+    setApiKey(apiKeyInput)
+    setShowApiKey(false)
+  }
+
+  function clearApiKey() {
+    localStorage.removeItem('openai_api_key')
+    setApiKey('')
+    setApiKeyInput('')
+    setShowApiKey(false)
+  }
+
   async function handleExplain() {
     setExplaining(true)
     setTab('explanation')
     try {
-      const r = await getExplanation(id)
+      const r = await getExplanation(id, apiKey || null)
       setExplanation(r.data)
     } catch(e) {
       setExplanation({ error: e.response?.data?.detail || e.message })
     } finally { setExplaining(false) }
+  }
+
+  async function handleStageWiseExplain() {
+    setExplainingStage(true)
+    try {
+      const r = await getStageWiseExplanation(id, apiKey || null)
+      setStageExplanation(r.data)
+    } catch(e) {
+      setStageExplanation({ error: e.response?.data?.detail || e.message })
+    } finally { setExplainingStage(false) }
+  }
+
+  async function handleOverallExplain() {
+    setExplainingOverall(true)
+    try {
+      const r = await getOverallExplanation(id, apiKey || null)
+      setOverallExpl(r.data)
+    } catch(e) {
+      setOverallExpl({ error: e.response?.data?.detail || e.message })
+    } finally { setExplainingOverall(false) }
   }
 
   async function handleStageWise() {
@@ -640,118 +733,220 @@ export default function ProjectDetailPage() {
 
       {/* ── Tab: AI Explanation ── */}
       {tab === 'explanation' && (
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 320px', gap:20 }}>
-          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-            {explaining && (
-              <div className="card" style={{ padding:40, textAlign:'center' }}>
-                <div className="spinner" style={{ margin:'0 auto 16px' }} />
-                <div style={{ fontSize:13, color:'var(--gray-500)' }}>
-                  Querying AI with RAG context from LARR Act + CAG audit findings…
+        <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+
+          {/* ── API Key Panel (Test Mode) ── */}
+          <div className="card" style={{ padding:'14px 20px', background: apiKey ? '#f0fdf4' : '#fefce8', border: `1px solid ${apiKey ? '#86efac' : '#fde047'}` }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <span style={{ fontSize:18 }}>{apiKey ? '🔑' : '⚠️'}</span>
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, color: apiKey ? '#166534' : '#854d0e' }}>
+                    {apiKey ? 'OpenAI API Key Set (Test Mode)' : 'No API Key — Using Rule-based Fallback'}
+                  </div>
+                  <div style={{ fontSize:11, color: apiKey ? '#15803d' : '#a16207' }}>
+                    {apiKey
+                      ? `Key: sk-...${apiKey.slice(-8)} · Stored in browser`
+                      : 'Enter your OpenAI API key to enable GPT-4o-mini explanations. Key is stored only in your browser.'}
+                  </div>
                 </div>
               </div>
-            )}
-
-            {explanation?.error && (
-              <div className="card" style={{ padding:20, background:'var(--danger-light)', border:'1px solid var(--danger-border)' }}>
-                <div style={{ fontSize:13, fontWeight:700, color:'var(--danger)', marginBottom:6 }}>Explanation failed</div>
-                <div style={{ fontSize:12, color:'var(--danger)' }}>{explanation.error}</div>
+              <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                {apiKey && <button className="btn btn-outline btn-sm" style={{ fontSize:11 }} onClick={clearApiKey}>Clear Key</button>}
+                <button className="btn btn-outline btn-sm" style={{ fontSize:11 }} onClick={() => setShowApiKey(v => !v)}>
+                  {showApiKey ? 'Cancel' : apiKey ? 'Change Key' : 'Set API Key'}
+                </button>
               </div>
-            )}
+            </div>
 
-            {explanation && !explanation.error && !explaining && (
-              <>
-                {/* Model badge */}
-                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                  <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:3,
-                    background: explanation.model_used === 'gpt-4o-mini' ? '#e0f2fe' : 'var(--gray-100)',
-                    color: explanation.model_used === 'gpt-4o-mini' ? '#0369a1' : 'var(--gray-500)',
-                    border: explanation.model_used === 'gpt-4o-mini' ? '1px solid #7dd3fc' : '1px solid var(--gray-200)',
-                  }}>
-                    {explanation.model_used === 'gpt-4o-mini' ? 'GPT-4o-mini' : 'Rule-based fallback'}
-                  </span>
-                  <span style={{ fontSize:11, color:'var(--gray-400)' }}>
-                    {explanation.kb_chunks_used} KB chunks · {explanation.tokens_used || 0} tokens
-                  </span>
-                  {explanation.sources?.length > 0 && (
-                    <span style={{ fontSize:11, color:'var(--gray-400)' }}>
-                      Citations: {explanation.sources.slice(0,6).join(', ')}{explanation.sources.length > 6 ? '…' : ''}
-                    </span>
-                  )}
-                </div>
-
-                {/* WHY */}
-                <div className="card">
-                  <div className="detail-section-title" style={{ color:'var(--danger)', borderColor:'var(--danger-border)' }}>
-                    Why This Risk Score
-                  </div>
-                  <div style={{ fontSize:13, color:'var(--gray-700)', lineHeight:1.7, whiteSpace:'pre-wrap' }}>
-                    {explanation.why}
-                  </div>
-                </div>
-
-                {/* ACTIONS */}
-                {explanation.actions && (
-                  <div className="card">
-                    <div className="detail-section-title" style={{ color:'var(--warning)', borderColor:'var(--warning-border)' }}>
-                      Recommended Actions
-                    </div>
-                    <div style={{ fontSize:13, color:'var(--gray-700)', lineHeight:1.7, whiteSpace:'pre-wrap' }}>
-                      {explanation.actions}
-                    </div>
-                  </div>
-                )}
-
-                {/* LEGAL BASIS */}
-                {explanation.legal_basis && (
-                  <div className="card" style={{ background:'var(--gray-50)' }}>
-                    <div className="detail-section-title">
-                      Legal Basis (LARR Act / CAG Audit)
-                    </div>
-                    <div style={{ fontSize:12, color:'var(--gray-600)', lineHeight:1.7, whiteSpace:'pre-wrap' }}>
-                      {explanation.legal_basis}
-                    </div>
-                    <div style={{ marginTop:12, fontSize:11, color:'var(--gray-400)', borderTop:'1px solid var(--gray-200)', paddingTop:10 }}>
-                      Sources: LARR Act 2013 (indiacode.nic.in) · CAG Audit Reports (cag.gov.in)
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {!explanation && !explaining && (
-              <div className="card" style={{ padding:40, textAlign:'center' }}>
-                <div style={{ fontSize:13, color:'var(--gray-500)', marginBottom:16 }}>
-                  Click "AI Explain" to generate a grounded explanation citing LARR Act provisions and CAG audit findings.
-                </div>
-                <button className="btn btn-primary" onClick={handleExplain} disabled={!project.risk_score}>
-                  Generate AI Explanation
+            {showApiKey && (
+              <div style={{ marginTop:12, display:'flex', gap:8, alignItems:'center' }}>
+                <input
+                  type="password"
+                  className="form-input"
+                  style={{ flex:1, fontFamily:'var(--font-mono)', fontSize:12 }}
+                  placeholder="sk-proj-..."
+                  value={apiKeyInput}
+                  onChange={e => setApiKeyInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && saveApiKey()}
+                />
+                <button className="btn btn-primary btn-sm" onClick={saveApiKey} disabled={!apiKeyInput.trim()}>
+                  Save & Use
                 </button>
               </div>
             )}
           </div>
 
-          {/* Right: KB sources sidebar */}
-          <div className="card" style={{ alignSelf:'flex-start' }}>
-            <div className="detail-section-title">Knowledge Base Sources</div>
-            {[
-              { id:'LARR Act 2013', desc:'Legal framework for land acquisition, compensation & R&R', url:'https://www.indiacode.nic.in/' },
-              { id:'CAG MP Report', desc:'Audit findings: compensation delays, award overdue, record issues', url:'https://cag.gov.in/' },
-              { id:'CAG Telangana', desc:'Cross-state delay evidence, staffing & coordination issues', url:'https://cag.gov.in/' },
-              { id:'R-01 to R-08', desc:'8 prototype recommendation rules from SIH KB', url:'' },
-              { id:'FM-01 to FM-14', desc:'14 feature mappings with evidence strength ratings', url:'' },
-              { id:'LIFE-01..10', desc:'Lifecycle stage signals and delay indicators', url:'' },
-              { id:'ADMIN-01..10', desc:'Administrative bottleneck patterns and actions', url:'' },
-            ].map(s => (
-              <div key={s.id} style={{ display:'flex', flexDirection:'column', padding:'8px 0', borderBottom:'1px solid var(--gray-100)' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <span style={{ fontSize:11, fontWeight:700, fontFamily:'var(--font-mono)', color:'var(--primary)' }}>{s.id}</span>
-                  {s.url && <a href={s.url} target="_blank" rel="noreferrer" style={{ fontSize:10, color:'var(--primary-light)', textDecoration:'none' }} onClick={e=>e.stopPropagation()}>↗</a>}
+          {/* ── Three action buttons ── */}
+          <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
+            <button className="btn btn-primary" onClick={handleExplain}
+              disabled={explaining || !project.risk_score}>
+              {explaining ? <><div className="spinner-sm" />Explaining…</> : '🔍 Risk Explanation (WHY)'}
+            </button>
+            <button className="btn btn-outline" onClick={handleOverallExplain}
+              disabled={explainingOverall || !project.risk_score}>
+              {explainingOverall ? <><div className="spinner-sm" />Generating…</> : '📋 Overall Recommendations'}
+            </button>
+            <button className="btn btn-outline" onClick={handleStageWiseExplain}
+              disabled={explainingStage || !project.risk_score}>
+              {explainingStage ? <><div className="spinner-sm" />Analysing…</> : '📊 Per-Stage Analysis'}
+            </button>
+          </div>
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 300px', gap:20, alignItems:'start' }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+              {/* ── Risk Explanation (original WHY/ACTIONS/LEGAL) ── */}
+              {explaining && <LoadingCard text="Querying AI for risk explanation…" />}
+              {explanation?.error && <ErrorCard msg={explanation.error} />}
+              {explanation && !explanation.error && !explaining && (
+                <div className="card">
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+                    <div className="detail-section-title" style={{ margin:0 }}>🔍 Risk Explanation</div>
+                    <ModelBadge model={explanation.model_used} tokens={explanation.tokens_used} chunks={explanation.kb_chunks_used} />
+                  </div>
+                  {explanation.why && (
+                    <ExplainSection title="Why This Risk Score" color="var(--danger)" text={explanation.why} />
+                  )}
+                  {explanation.actions && (
+                    <ExplainSection title="Recommended Actions" color="var(--warning)" text={explanation.actions} />
+                  )}
+                  {explanation.legal_basis && (
+                    <ExplainSection title="Legal Basis (LARR Act / CAG Audit)" color="var(--primary)" text={explanation.legal_basis} footer="Sources: LARR Act 2013 · CAG Audit Reports" />
+                  )}
+                  {explanation.sources?.length > 0 && (
+                    <div style={{ marginTop:8, fontSize:11, color:'var(--gray-400)' }}>
+                      Citations: {explanation.sources.join(', ')}
+                    </div>
+                  )}
                 </div>
-                <span style={{ fontSize:11, color:'var(--gray-500)', marginTop:2 }}>{s.desc}</span>
+              )}
+
+              {/* ── Overall Recommendations ── */}
+              {explainingOverall && <LoadingCard text="Generating comprehensive overall recommendations…" />}
+              {overallExpl?.error && <ErrorCard msg={overallExpl.error} />}
+              {overallExpl && !overallExpl.error && !explainingOverall && (
+                <div className="card">
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+                    <div className="detail-section-title" style={{ margin:0 }}>📋 Overall Recommendations</div>
+                    <ModelBadge model={overallExpl.model_used} tokens={overallExpl.tokens_used} />
+                  </div>
+                  {overallExpl.summary && (
+                    <ExplainSection title="Executive Summary" color="var(--primary)" text={overallExpl.summary} />
+                  )}
+                  {overallExpl.critical_actions && (
+                    <ExplainSection title="Critical Actions (Priority Order)" color="var(--danger)" text={overallExpl.critical_actions} />
+                  )}
+                  {overallExpl.bottlenecks && (
+                    <ExplainSection title="Key Bottlenecks" color="var(--warning)" text={overallExpl.bottlenecks} />
+                  )}
+                  {overallExpl.outlook && (
+                    <ExplainSection title="Outlook & Timeline" color="var(--success)" text={overallExpl.outlook} />
+                  )}
+                </div>
+              )}
+
+              {/* ── Per-Stage Analysis ── */}
+              {explainingStage && <LoadingCard text="Running per-stage AI analysis for all 6 acquisition stages…" />}
+              {stageExplanation?.error && <ErrorCard msg={stageExplanation.error} />}
+              {stageExplanation && !stageExplanation.error && !explainingStage && (
+                <div className="card">
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+                    <div className="detail-section-title" style={{ margin:0 }}>📊 Per-Stage Analysis</div>
+                    <ModelBadge model={stageExplanation.model_used} tokens={stageExplanation.total_tokens} />
+                  </div>
+                  {(stageExplanation.stage_recommendations || []).map((s, i) => {
+                    const relColor = s.relation === 'current' ? 'var(--primary)'
+                      : s.relation === 'past' ? 'var(--success)' : 'var(--gray-400)'
+                    const relBg = s.relation === 'current' ? 'var(--primary-light)'
+                      : s.relation === 'past' ? '#f0fdf4' : 'var(--gray-50)'
+                    const statusLine = s.text?.split('\n')[0] || ''
+                    const isCritical = statusLine.toUpperCase().includes('CRITICAL')
+                    const isDelayed  = statusLine.toUpperCase().includes('DELAYED')
+                    return (
+                      <details key={i} style={{
+                        marginBottom:8, borderRadius:'var(--radius)',
+                        border:`1px solid ${s.relation==='current' ? 'var(--primary)' : 'var(--gray-200)'}`,
+                        background: relBg, overflow:'hidden',
+                      }}>
+                        <summary style={{
+                          padding:'10px 14px', cursor:'pointer', userSelect:'none',
+                          display:'flex', alignItems:'center', gap:10, listStyle:'none',
+                          fontWeight: s.relation === 'current' ? 700 : 500,
+                        }}>
+                          <span style={{
+                            width:22, height:22, borderRadius:'50%', flexShrink:0,
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                            background: relColor, color:'#fff', fontSize:10, fontWeight:700,
+                          }}>{i + 1}</span>
+                          <span style={{ flex:1, fontSize:13, color:'var(--gray-800)' }}>{s.stage_name}</span>
+                          {s.relation === 'current' && (
+                            <span style={{ fontSize:9, background:'var(--primary)', color:'#fff', padding:'2px 6px', borderRadius:3, fontWeight:700 }}>CURRENT</span>
+                          )}
+                          {isCritical && <span style={{ fontSize:9, background:'var(--danger)', color:'#fff', padding:'2px 6px', borderRadius:3 }}>CRITICAL</span>}
+                          {isDelayed && !isCritical && <span style={{ fontSize:9, background:'var(--warning)', color:'#fff', padding:'2px 6px', borderRadius:3 }}>DELAYED</span>}
+                          {s.relation === 'past' && <span style={{ fontSize:9, background:'var(--success)', color:'#fff', padding:'2px 6px', borderRadius:3 }}>DONE</span>}
+                          {s.relation === 'future' && <span style={{ fontSize:9, background:'var(--gray-300)', color:'var(--gray-700)', padding:'2px 6px', borderRadius:3 }}>UPCOMING</span>}
+                          <ModelBadge model={s.model_used} tiny />
+                        </summary>
+                        <div style={{ padding:'12px 14px', borderTop:'1px solid var(--gray-200)', fontSize:13, color:'var(--gray-700)', lineHeight:1.8, whiteSpace:'pre-wrap', background:'#fff' }}>
+                          {s.text}
+                        </div>
+                      </details>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Empty state */}
+              {!explanation && !overallExpl && !stageExplanation && !explaining && !explainingOverall && !explainingStage && (
+                <div className="card" style={{ padding:48, textAlign:'center' }}>
+                  <div style={{ fontSize:32, marginBottom:12 }}>🤖</div>
+                  <div style={{ fontSize:14, fontWeight:600, color:'var(--gray-700)', marginBottom:8 }}>
+                    AI-Powered Recommendations
+                  </div>
+                  <div style={{ fontSize:13, color:'var(--gray-500)', marginBottom:20, maxWidth:400, margin:'0 auto 20px' }}>
+                    Get grounded analysis citing LARR Act 2013 provisions and CAG audit findings.
+                    {!apiKey && ' Set your OpenAI API key above for GPT-4o-mini analysis.'}
+                  </div>
+                  <div style={{ display:'flex', gap:10, justifyContent:'center', flexWrap:'wrap' }}>
+                    <button className="btn btn-primary" onClick={handleExplain} disabled={!project.risk_score}>
+                      🔍 Risk Explanation
+                    </button>
+                    <button className="btn btn-outline" onClick={handleOverallExplain} disabled={!project.risk_score}>
+                      📋 Overall Recommendations
+                    </button>
+                    <button className="btn btn-outline" onClick={handleStageWiseExplain} disabled={!project.risk_score}>
+                      📊 Per-Stage Analysis
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Right sidebar: KB sources ── */}
+            <div className="card" style={{ alignSelf:'flex-start', position:'sticky', top:20 }}>
+              <div className="detail-section-title">Knowledge Base Sources</div>
+              {[
+                { id:'LARR Act 2013', desc:'Legal framework for land acquisition, compensation & R&R', url:'https://www.indiacode.nic.in/' },
+                { id:'CAG MP Report', desc:'Audit findings: compensation delays, award overdue, record issues', url:'https://cag.gov.in/' },
+                { id:'CAG Telangana', desc:'Cross-state delay evidence, staffing & coordination issues', url:'https://cag.gov.in/' },
+                { id:'R-01 to R-08', desc:'8 prototype recommendation rules from SIH KB', url:'' },
+                { id:'FM-01 to FM-14', desc:'14 feature mappings with evidence strength ratings', url:'' },
+                { id:'LIFE-01..10', desc:'Lifecycle stage signals and delay indicators', url:'' },
+                { id:'ADMIN-01..10', desc:'Administrative bottleneck patterns and actions', url:'' },
+              ].map(s => (
+                <div key={s.id} style={{ display:'flex', flexDirection:'column', padding:'8px 0', borderBottom:'1px solid var(--gray-100)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <span style={{ fontSize:11, fontWeight:700, fontFamily:'var(--font-mono)', color:'var(--primary)' }}>{s.id}</span>
+                    {s.url && <a href={s.url} target="_blank" rel="noreferrer" style={{ fontSize:10, color:'var(--primary)', textDecoration:'none' }}>↗</a>}
+                  </div>
+                  <span style={{ fontSize:11, color:'var(--gray-500)', marginTop:2 }}>{s.desc}</span>
+                </div>
+              ))}
+              <div style={{ marginTop:12, fontSize:11, color:'var(--gray-400)', lineHeight:1.5 }}>
+                72 KB chunks · 4 knowledge-base files · Retrieved contextually per triggered rules + stage.
               </div>
-            ))}
-            <div style={{ marginTop:12, fontSize:11, color:'var(--gray-400)', lineHeight:1.5 }}>
-              Total: 72 KB chunks across 4 knowledge-base files. Retrieved contextually based on triggered rules and acquisition stage.
             </div>
           </div>
         </div>
