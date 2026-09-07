@@ -84,7 +84,7 @@ export default function DashboardPage() {
           <div className="page-subtitle">Summary of all land acquisition projects and risk indicators</div>
         </div>
         {(user?.role === 'central' || user?.role === 'state') && (
-          <button className="btn btn-primary" onClick={handleBatchScore} disabled={scoring}>
+          <button className="btn btn-primary" onClick={handleBatchScore} disabled={scoring} style={{ display: 'none' }}>
             <Icon.Lightning />
             {scoring ? 'Scoring in progress…' : 'Run Batch Score'}
           </button>
