@@ -87,7 +87,7 @@ export default function LoginPage() {
             overflow: 'hidden',
             boxShadow: '0 8px 24px rgba(0,0,0,.15)',
           }}>
-            <img src="/login_nivaran.avif" alt="Nivaran Illustration"
+            <img src="/bhoomi_nivaran_signin.jpeg" alt="Nivaran Illustration"
                  style={{
                    width: '100%',
                    height: '100%',
