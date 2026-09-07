@@ -47,7 +47,7 @@ export default function LoginPage() {
       }}>
         <img src="/logo_bhoomi.png" alt="Bhoomi Logo"
              style={{
-               width: 44,
+               width: 56,
                height: 'auto',
                borderRadius: 8,
                objectFit: 'contain',
@@ -55,7 +55,7 @@ export default function LoginPage() {
              }} />
         <span style={{
           color: '#000',
-          fontSize: 13,
+          fontSize: 16,
           fontWeight: 600,
           letterSpacing: '0.2px',
         }}>
