@@ -38,18 +38,23 @@ from app.services.rag_kb import (
 
 PROVIDERS = {
     "openai": {
-        "base_url": None,                                      # default openai endpoint
+        "base_url": None,
         "model":    "gpt-4o-mini",
         "env_key":  "OPENAI_API_KEY",
     },
+    "groq": {
+        "base_url": "https://api.groq.com/openai/v1",
+        "model":    "llama-3.1-70b-versatile",
+        "env_key":  "GROQ_API_KEY",
+    },
     "nvidia": {
         "base_url": "https://integrate.api.nvidia.com/v1",
-        "model":    "nvidia/llama-3.3-nemotron-super-49b-v1",  # free tier model
+        "model":    "google/gemma-3-12b-it",
         "env_key":  "NVIDIA_API_KEY",
     },
     "openrouter": {
         "base_url": "https://openrouter.ai/api/v1",
-        "model":    "mistralai/mistral-7b-instruct:free",       # free model
+        "model":    "mistralai/mistral-7b-instruct:free",
         "env_key":  "OPENROUTER_API_KEY",
     },
 }

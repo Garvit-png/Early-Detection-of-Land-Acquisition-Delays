@@ -578,7 +578,7 @@ export default function ProjectDetailPage() {
   const [apiKey,     setApiKey]     = useState(() => localStorage.getItem('openai_api_key') || '')
   const [showApiKey, setShowApiKey] = useState(false)
   const [apiKeyInput,setApiKeyInput]= useState(() => localStorage.getItem('openai_api_key') || '')
-  const [aiProvider, setAiProvider] = useState(() => localStorage.getItem('ai_provider') || 'nvidia')
+  const [aiProvider, setAiProvider] = useState(() => localStorage.getItem('ai_provider') || 'groq')
   const [loadingStage, setLoadingStage] = useState(false)
 
   // Stage click — in-place AI analysis
@@ -857,7 +857,7 @@ export default function ProjectDetailPage() {
                   {/* Provider selector */}
                   <div style={{ display:'flex', gap:4 }}>
                     {[
-                      { id:'nvidia',     label:'NVIDIA',      hint:'Free · Nemotron 49B' },
+                      { id:'groq',       label:'Groq',        hint:'Free · Llama 3.1 70B · Fast' },
                       { id:'openai',     label:'OpenAI',      hint:'GPT-4o-mini · Paid' },
                       { id:'openrouter', label:'OpenRouter',  hint:'Mistral 7B · Free' },
                     ].map(p => (
@@ -880,14 +880,14 @@ export default function ProjectDetailPage() {
               </div>
               {/* Provider hint */}
               <div style={{ marginTop:6, fontSize:10, color:'var(--gray-500)' }}>
-                {aiProvider === 'nvidia'     && '🟢 NVIDIA Nemotron-49B — Free at build.nvidia.com → Get API Key → paste here'}
+                {aiProvider === 'groq'       && '🟢 Groq — FREE · Llama 3.1 70B · Fast · console.groq.com → API Keys → Create'}
                 {aiProvider === 'openai'     && '🔵 OpenAI GPT-4o-mini — platform.openai.com (paid, ~$0.01/1K tokens)'}
-                {aiProvider === 'openrouter' && '🟣 OpenRouter Mistral-7B — openrouter.ai (free tier available)'}
+                {aiProvider === 'openrouter' && '🟣 OpenRouter — openrouter.ai → Free tier available → API Keys'}
               </div>
               {showApiKey && (
                 <div style={{ marginTop:10, display:'flex', gap:8 }}>
                   <input type="password" className="form-input" style={{ flex:1, fontFamily:'var(--font-mono)', fontSize:12 }}
-                    placeholder={aiProvider === 'nvidia' ? 'nvapi-...' : aiProvider === 'openrouter' ? 'sk-or-...' : 'sk-proj-...'}
+                    placeholder={aiProvider === 'groq' ? 'gsk_...' : aiProvider === 'openrouter' ? 'sk-or-...' : 'sk-proj-...'}
                     value={apiKeyInput}
                     onChange={e => setApiKeyInput(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && saveApiKey()} />
@@ -896,102 +896,90 @@ export default function ProjectDetailPage() {
               )}
             </div>
 
-            {/* Chat window */}
-            <div className="card" style={{ padding:0, overflow:'hidden', display:'flex', flexDirection:'column', minHeight:500 }}>
+            {/* Terminal-style Chat window */}
+            <div style={{ borderRadius:'var(--radius)', overflow:'hidden', border:'1px solid #1e293b', boxShadow:'0 4px 24px rgba(0,0,0,.18)' }}>
 
-              {/* Chat header */}
-              <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--gray-200)', background:'var(--gray-50)', display:'flex', alignItems:'center', gap:10 }}>
-                <span style={{ fontSize:20 }}>🤖</span>
-                <div>
-                  <div style={{ fontWeight:700, fontSize:13 }}>Project AI Advisor</div>
-                  <div style={{ fontSize:11, color:'var(--gray-400)' }}>
-                    Knows full details of {project.project_id} · {project.project_name}
-                  </div>
-                </div>
+              {/* Terminal title bar */}
+              <div style={{ background:'#1e293b', padding:'8px 14px', display:'flex', alignItems:'center', gap:8 }}>
+                <span style={{ width:10, height:10, borderRadius:'50%', background:'#ef4444', display:'inline-block' }}/>
+                <span style={{ width:10, height:10, borderRadius:'50%', background:'#f59e0b', display:'inline-block' }}/>
+                <span style={{ width:10, height:10, borderRadius:'50%', background:'#22c55e', display:'inline-block' }}/>
+                <span style={{ fontFamily:'var(--font-mono)', fontSize:11, color:'#94a3b8', marginLeft:8 }}>
+                  bhoomi-ai — {project.project_id} — {aiProvider}
+                </span>
                 {chatHistory.length > 0 && (
-                  <button className="btn btn-ghost btn-sm" style={{ marginLeft:'auto', fontSize:11 }}
-                    onClick={() => { setChatHistory([]); setChatInitialized(false) }}>
-                    Clear chat
+                  <button onClick={() => { setChatHistory([]); setChatInitialized(false) }}
+                    style={{ marginLeft:'auto', background:'none', border:'none', color:'#64748b', cursor:'pointer', fontSize:10, fontFamily:'var(--font-mono)' }}>
+                    clear
                   </button>
                 )}
               </div>
 
-              {/* Messages */}
-              <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:12, maxHeight:480 }}>
+              {/* Terminal body */}
+              <div style={{ background:'#0f172a', minHeight:420, maxHeight:500, overflowY:'auto', padding:'12px 16px', display:'flex', flexDirection:'column', gap:8, fontFamily:'var(--font-mono)', fontSize:12 }}>
+
+                {/* System info on load */}
+                <div style={{ color:'#475569', lineHeight:1.6 }}>
+                  <div>{'>'} Project loaded: <span style={{ color:'#38bdf8' }}>{project.project_id}</span> — {project.project_name}</div>
+                  <div>{'>'} Risk: <span style={{ color: project.risk_score >= 70 ? '#f87171' : project.risk_score >= 40 ? '#fb923c' : '#4ade80' }}>{project.risk_score ?? 'N/A'}/100 ({project.risk_category ?? 'unscored'})</span></div>
+                  <div>{'>'} Stage: <span style={{ color:'#a78bfa' }}>{project.current_stage}</span></div>
+                  <div>{'>'} Provider: <span style={{ color:'#34d399' }}>{aiProvider}</span> {apiKey ? '· key set ✓' : '· <span style="color:#fbbf24">no key — set above</span>'}</div>
+                  <div style={{ color:'#1e3a5f', marginTop:4 }}>{'─'.repeat(48)}</div>
+                </div>
+
                 {chatHistory.length === 0 && !chatLoading && (
-                  <div style={{ textAlign:'center', padding:'40px 20px' }}>
-                    <div style={{ fontSize:32, marginBottom:12 }}>💬</div>
-                    <div style={{ fontSize:14, fontWeight:600, color:'var(--gray-700)', marginBottom:8 }}>
-                      Ask anything about this project
-                    </div>
-                    <div style={{ fontSize:12, color:'var(--gray-400)', marginBottom:20 }}>
-                      I've read all project data — risks, stages, financials, legal status.
-                    </div>
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:8, justifyContent:'center' }}>
-                      {[
-                        'Why is this project high risk?',
-                        'What should I do first?',
-                        'Explain the legal issues',
-                        'How long will delays last?',
-                        'What does R-01 mean here?',
-                      ].map(q => (
-                        <button key={q} className="btn btn-outline btn-sm" style={{ fontSize:11 }}
-                          onClick={() => sendChatMessage(q)}>
-                          {q}
-                        </button>
-                      ))}
-                    </div>
+                  <div style={{ color:'#64748b', lineHeight:2 }}>
+                    <div>Suggested queries:</div>
+                    {[
+                      'Why is this project high risk?',
+                      'What should be the first action?',
+                      'Explain legal issues in simple terms',
+                      'How long will delays last?',
+                      'What does R-01 mean for this project?',
+                    ].map(q => (
+                      <div key={q} style={{ cursor:'pointer', color:'#38bdf8' }}
+                        onClick={() => sendChatMessage(q)}>
+                        $ {q}
+                      </div>
+                    ))}
                   </div>
                 )}
 
                 {chatHistory.map((msg, i) => (
-                  <div key={i} style={{
-                    display:'flex', flexDirection:'column',
-                    alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                  }}>
-                    <div style={{
-                      maxWidth:'80%', padding:'10px 14px', borderRadius:12,
-                      borderBottomRightRadius: msg.role === 'user' ? 2 : 12,
-                      borderBottomLeftRadius:  msg.role === 'assistant' ? 2 : 12,
-                      background: msg.role === 'user' ? 'var(--primary)' : 'var(--gray-100)',
-                      color: msg.role === 'user' ? '#fff' : 'var(--gray-800)',
-                      fontSize:13, lineHeight:1.7, whiteSpace:'pre-wrap',
-                    }}>
-                      {msg.content}
-                    </div>
-                    <div style={{ fontSize:10, color:'var(--gray-300)', marginTop:2, paddingLeft:4 }}>
-                      {msg.role === 'user' ? 'You' : 'AI Advisor'}
-                    </div>
+                  <div key={i}>
+                    {msg.role === 'user' ? (
+                      <div style={{ color:'#38bdf8' }}>$ {msg.content}</div>
+                    ) : (
+                      <div style={{ color:'#e2e8f0', lineHeight:1.7, whiteSpace:'pre-wrap', paddingLeft:2 }}>
+                        {msg.content}
+                      </div>
+                    )}
                   </div>
                 ))}
 
                 {chatLoading && (
-                  <div style={{ display:'flex', alignItems:'flex-start', gap:8 }}>
-                    <div style={{ padding:'10px 14px', borderRadius:12, borderBottomLeftRadius:2, background:'var(--gray-100)' }}>
-                      <div style={{ display:'flex', gap:4, alignItems:'center' }}>
-                        <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--gray-400)', animation:'pulse 1s infinite' }} />
-                        <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--gray-400)', animation:'pulse 1s .2s infinite' }} />
-                        <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--gray-400)', animation:'pulse 1s .4s infinite' }} />
-                      </div>
-                    </div>
+                  <div style={{ color:'#64748b', fontFamily:'var(--font-mono)' }}>
+                    <span style={{ animation:'pulse 1s infinite' }}>▋</span>
                   </div>
                 )}
               </div>
 
-              {/* Input area */}
-              <div style={{ padding:'12px 16px', borderTop:'1px solid var(--gray-200)', display:'flex', gap:8 }}>
+              {/* Input line */}
+              <div style={{ background:'#0f172a', borderTop:'1px solid #1e293b', padding:'8px 12px', display:'flex', alignItems:'center', gap:8 }}>
+                <span style={{ color:'#38bdf8', fontFamily:'var(--font-mono)', fontSize:12, flexShrink:0 }}>$</span>
                 <input
-                  className="form-input"
-                  style={{ flex:1, fontSize:13 }}
-                  placeholder="Ask about this project… (Press Enter to send)"
+                  style={{ flex:1, background:'transparent', border:'none', outline:'none', color:'#f1f5f9', fontFamily:'var(--font-mono)', fontSize:12 }}
+                  placeholder="Ask anything about this project…"
                   value={chatInput}
                   onChange={e => setChatInput(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !chatLoading) { e.preventDefault(); sendChatMessage(chatInput) } }}
                   disabled={chatLoading}
+                  autoFocus
                 />
-                <button className="btn btn-primary" onClick={() => sendChatMessage(chatInput)}
+                <button className="btn btn-primary" style={{ fontSize:11, padding:'4px 12px', flexShrink:0 }}
+                  onClick={() => sendChatMessage(chatInput)}
                   disabled={chatLoading || !chatInput.trim()}>
-                  Send
+                  Run
                 </button>
               </div>
             </div>
