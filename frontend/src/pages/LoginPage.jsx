@@ -33,86 +33,105 @@ export default function LoginPage() {
 
       {/* ── Left panel — green branding ── */}
       <div style={{
-        background: 'linear-gradient(145deg, #1a5c3a 0%, #0f3d27 60%, #0a2d1c 100%)',
+        background: '#0f3d27',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'space-between',
-        padding: '48px',
+        padding: '40px 48px',
         position: 'relative',
         overflow: 'hidden',
       }}>
-        {/* Decorative circles */}
+        {/* Subtle grid pattern overlay */}
         <div style={{
-          position: 'absolute', width: 320, height: 320, borderRadius: '50%',
-          background: 'rgba(255,255,255,.04)', top: -80, right: -80,
+          position: 'absolute', inset: 0,
+          backgroundImage: 'radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px)',
+          backgroundSize: '28px 28px',
         }} />
+        {/* Green glow bottom right */}
         <div style={{
-          position: 'absolute', width: 200, height: 200, borderRadius: '50%',
-          background: 'rgba(255,255,255,.04)', bottom: 60, left: -60,
-        }} />
-        <div style={{
-          position: 'absolute', width: 120, height: 120, borderRadius: '50%',
-          background: 'rgba(34,197,94,.1)', bottom: 200, right: 60,
+          position: 'absolute', width: 400, height: 400, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(34,197,94,.12) 0%, transparent 70%)',
+          bottom: -100, right: -100,
         }} />
 
-        {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative' }}>
-          <img src="/logo_bhoomi.png" alt="Logo"
-            style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'contain' }} />
+        {/* ── Logo bar ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, position: 'relative', zIndex: 1 }}>
+          {/* White square box for logo */}
+          <div style={{
+            width: 48, height: 48,
+            background: '#ffffff',
+            borderRadius: 12,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 12px rgba(0,0,0,.2)',
+            flexShrink: 0,
+          }}>
+            <img src="/logo_bhoomi.png" alt="Logo"
+              style={{ width: 36, height: 36, objectFit: 'contain' }} />
+          </div>
           <div>
-            <div style={{ color: '#fff', fontSize: 15, fontWeight: 700 }}>Bhoomi Nivaran</div>
-            <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 11 }}>Ministry of Rural Development</div>
+            <div style={{ color: '#fff', fontSize: 16, fontWeight: 700, letterSpacing: '-.01em' }}>Bhoomi Nivaran</div>
+            <div style={{ color: 'rgba(255,255,255,.45)', fontSize: 11 }}>DoLR · Ministry of Rural Development</div>
           </div>
         </div>
 
-        {/* Center content */}
-        <div style={{ position: 'relative' }}>
-          {/* Big icon */}
+        {/* ── Main content — centered ── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative', zIndex: 1, paddingTop: 32, paddingBottom: 32 }}>
+
+          {/* Tag */}
           <div style={{
-            width: 72, height: 72, borderRadius: 20,
-            background: 'rgba(255,255,255,.1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            marginBottom: 28,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            background: 'rgba(34,197,94,.15)', border: '1px solid rgba(34,197,94,.3)',
+            borderRadius: 999, padding: '4px 12px',
+            fontSize: 11, fontWeight: 600, color: '#4ade80',
+            marginBottom: 20, alignSelf: 'flex-start',
           }}>
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-              <polyline points="9 22 9 12 15 12 15 22"/>
-            </svg>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
+            AI-Powered Analytics
           </div>
 
-          <h1 style={{ color: '#fff', fontSize: 30, fontWeight: 800, lineHeight: 1.2, marginBottom: 14 }}>
-            Land Acquisition<br />Delay Predictor
+          <h1 style={{ color: '#fff', fontSize: 32, fontWeight: 800, lineHeight: 1.15, marginBottom: 16, letterSpacing: '-.02em' }}>
+            Early Detection of<br />
+            <span style={{ color: '#4ade80' }}>Land Acquisition</span><br />
+            Delays
           </h1>
-          <p style={{ color: 'rgba(255,255,255,.6)', fontSize: 13.5, lineHeight: 1.7, maxWidth: 320 }}>
-            AI-powered predictive analytics for early detection of delays in land acquisition projects across India.
+
+          <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, lineHeight: 1.75, maxWidth: 300 }}>
+            Predictive risk scoring across all states, powered by XGBoost + SHAP explainability for transparent decisions.
           </p>
 
-          {/* Stats row */}
-          <div style={{ display: 'flex', gap: 20, marginTop: 36 }}>
-            {[['5000+', 'Projects'], ['28', 'States'], ['92%', 'Accuracy']].map(([val, label]) => (
-              <div key={label} style={{
-                background: 'rgba(255,255,255,.08)',
-                border: '1px solid rgba(255,255,255,.12)',
-                borderRadius: 12, padding: '12px 16px', textAlign: 'center', flex: 1,
-              }}>
-                <div style={{ color: '#22c55e', fontSize: 18, fontWeight: 800 }}>{val}</div>
-                <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 11, marginTop: 2 }}>{label}</div>
+          {/* Divider */}
+          <div style={{ height: 1, background: 'rgba(255,255,255,.08)', margin: '28px 0' }} />
+
+          {/* Feature list */}
+          {[
+            ['📊', 'Real-time risk scoring across 5000+ projects'],
+            ['🗺️', 'GIS map view with state-wise analytics'],
+            ['🤖', 'AI recommendations with audit trail'],
+          ].map(([icon, text]) => (
+            <div key={text} style={{
+              display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14,
+            }}>
+              <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>{icon}</span>
+              <span style={{ color: 'rgba(255,255,255,.6)', fontSize: 12.5, lineHeight: 1.5 }}>{text}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Bottom footer ── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          position: 'relative', zIndex: 1,
+        }}>
+          <span style={{ color: 'rgba(255,255,255,.3)', fontSize: 11 }}>
+            © 2026 Government of India
+          </span>
+          <div style={{ display: 'flex', gap: 12 }}>
+            {[['5K+', 'Projects'], ['28', 'States'], ['92%', 'Accuracy']].map(([val, label]) => (
+              <div key={label} style={{ textAlign: 'center' }}>
+                <div style={{ color: '#4ade80', fontSize: 13, fontWeight: 700 }}>{val}</div>
+                <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 10 }}>{label}</div>
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Bottom badge */}
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          padding: '8px 14px',
-          background: 'rgba(255,255,255,.07)',
-          border: '1px solid rgba(255,255,255,.12)',
-          borderRadius: 999, color: 'rgba(255,255,255,.6)', fontSize: 11.5,
-          position: 'relative',
-        }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-          DoLR — Government of India
         </div>
       </div>
 
