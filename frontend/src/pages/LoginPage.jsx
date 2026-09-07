@@ -74,58 +74,23 @@ export default function LoginPage() {
         </div>
 
         {/* ── Main content — centered ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative', zIndex: 1, paddingTop: 32, paddingBottom: 32 }}>
-
-          {/* Tag */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', position: 'relative', zIndex: 1 }}>
           <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            background: 'rgba(34,197,94,.15)', border: '1px solid rgba(34,197,94,.3)',
-            borderRadius: 999, padding: '4px 12px',
-            fontSize: 11, fontWeight: 600, color: '#4ade80',
-            marginBottom: 20, alignSelf: 'flex-start',
-          }}>
-            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
-            AI-Powered Analytics
-          </div>
-
-          <h1 style={{ color: '#fff', fontSize: 32, fontWeight: 800, lineHeight: 1.15, marginBottom: 16, letterSpacing: '-.02em' }}>
-            Early Detection of<br />
-            <span style={{ color: '#4ade80' }}>Land Acquisition</span><br />
-            Delays
-          </h1>
-
-          <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, lineHeight: 1.75, maxWidth: 300, marginBottom: 24 }}>
-            Predictive risk scoring across all states, powered by XGBoost + SHAP explainability for transparent decisions.
-          </p>
-
-          {/* Image */}
-          <div style={{
-            borderRadius: 16,
+            borderRadius: 20,
             overflow: 'hidden',
-            boxShadow: '0 8px 32px rgba(0,0,0,.3)',
-            maxHeight: 220,
+            boxShadow: '0 12px 40px rgba(0,0,0,.35)',
+            width: '75%',
           }}>
             <img src="/new_single.png" alt="Land Acquisition"
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              style={{ width: '100%', display: 'block', objectFit: 'cover' }} />
           </div>
         </div>
 
         {/* ── Bottom footer ── */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          position: 'relative', zIndex: 1,
-        }}>
-          <span style={{ color: 'rgba(255,255,255,.3)', fontSize: 11 }}>
-            © 2026 Government of India
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <span style={{ color: 'rgba(255,255,255,.25)', fontSize: 11 }}>
+            © 2026 Government of India · DoLR
           </span>
-          <div style={{ display: 'flex', gap: 12 }}>
-            {[['5K+', 'Projects'], ['28', 'States'], ['92%', 'Accuracy']].map(([val, label]) => (
-              <div key={label} style={{ textAlign: 'center' }}>
-                <div style={{ color: '#4ade80', fontSize: 13, fontWeight: 700 }}>{val}</div>
-                <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 10 }}>{label}</div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 
