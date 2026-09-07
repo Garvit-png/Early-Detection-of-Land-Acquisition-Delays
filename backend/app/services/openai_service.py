@@ -1,20 +1,15 @@
 """
 openai_service.py — AI Explanation Brain
 
-Uses GPT-4o-mini (cost-efficient) with RAG context from the 4 SIH knowledge-base
-files to generate grounded, citable explanations for each project's risk score.
+Supports multiple LLM providers (all OpenAI-compatible):
+  - openai     → GPT-4o-mini  (api.openai.com)
+  - nvidia      → nvidia/nemotron-ultra-253b-v1 (FREE, integrate.api.nvidia.com)
+  - openrouter  → any model via openrouter.ai
 
-Architecture:
-  XGBoost  →  risk score + SHAP top factors       (prediction brain)
-  This     →  natural-language explanation         (explanation brain)
-                grounded in LARR Act + CAG audits  (RAG knowledge base)
-                with actionable recommendations
-                citing rule IDs (R-01..R-08)
+Provider is selected via X-AI-Provider header from frontend (defaults to openai).
+API key is from X-OpenAI-Key header or OPENAI_API_KEY / NVIDIA_API_KEY env vars.
 
-Falls back gracefully to rule-based text if:
-  - OPENAI_API_KEY is not set
-  - API call fails / times out
-  - Rate limit hit
+Falls back gracefully to rule-based text if no key available.
 """
 
 import json
@@ -38,6 +33,38 @@ from app.services.rag_kb import (
     get_rule_summary,
     chunks_to_context,
 )
+
+# ─── Provider config ──────────────────────────────────────────────────────────
+
+PROVIDERS = {
+    "openai": {
+        "base_url": None,                                      # default openai endpoint
+        "model":    "gpt-4o-mini",
+        "env_key":  "OPENAI_API_KEY",
+    },
+    "nvidia": {
+        "base_url": "https://integrate.api.nvidia.com/v1",
+        "model":    "nvidia/llama-3.3-nemotron-super-49b-v1",  # free tier model
+        "env_key":  "NVIDIA_API_KEY",
+    },
+    "openrouter": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "model":    "mistralai/mistral-7b-instruct:free",       # free model
+        "env_key":  "OPENROUTER_API_KEY",
+    },
+}
+
+
+def _make_client(provider: str, api_key: str | None):
+    """Return an OpenAI-compatible client for the given provider."""
+    cfg = PROVIDERS.get(provider, PROVIDERS["openai"])
+    key = api_key or os.getenv(cfg["env_key"], "")
+    if not key:
+        return None, None
+    kwargs = {"api_key": key}
+    if cfg["base_url"]:
+        kwargs["base_url"] = cfg["base_url"]
+    return OpenAI(**kwargs), cfg["model"]
 
 # ─── System prompt ────────────────────────────────────────────────────────────
 SYSTEM_PROMPT = """You are an expert advisor on Indian land acquisition law and infrastructure project governance.
@@ -99,6 +126,7 @@ def explain_project(
     risk_score: float,
     risk_category: str,
     expected_delay_label: str | None = None,
+    provider: str = "openai",
 ) -> dict:
     """
     Generate a grounded AI explanation for a project's risk.
@@ -118,6 +146,10 @@ def explain_project(
     # Graceful fallback if key missing or openai not installed
     if not api_key or not _OPENAI_AVAILABLE:
         logger.info("OpenAI key not set — using rule-based fallback")
+        return _rule_fallback(project_data, rules_triggered)
+
+    client, model = _make_client(provider, api_key)
+    if not client:
         return _rule_fallback(project_data, rules_triggered)
 
     # ── Retrieve relevant KB chunks ───────────────────────────────────────────
@@ -171,11 +203,10 @@ PROJECT DATA:
 Generate the explanation now using the 3-section format (WHY / ACTIONS / LEGAL BASIS).
 """.strip()
 
-    # ── Call OpenAI ────────────────────────────────────────────────────────────
+    # ── Call AI provider ──────────────────────────────────────────────────────
     try:
-        client = OpenAI(api_key=api_key)
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=model,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user",   "content": user_prompt},
@@ -201,13 +232,13 @@ Generate the explanation now using the 3-section format (WHY / ACTIONS / LEGAL B
             "legal_basis":   sections.get("LEGAL BASIS", ""),
             "full_text":     raw,
             "sources":       cited_ids or rules_triggered,
-            "model_used":    "gpt-4o-mini",
+            "model_used":    model,
             "kb_chunks_used": len(all_chunks),
             "tokens_used":   response.usage.total_tokens if response.usage else 0,
         }
 
     except Exception as e:
-        logger.error(f"OpenAI call failed: {e} — falling back to rule-based")
+        logger.error(f"AI call failed ({provider}): {e} — falling back to rule-based")
         return _rule_fallback(project_data, rules_triggered)
 
 
@@ -272,14 +303,19 @@ def explain_stage_wise(
     risk_score: float,
     risk_category: str,
     api_key: str | None = None,
+    provider: str = "openai",
 ) -> dict:
     """
     Generate per-stage recommendations for all 6 acquisition stages.
     api_key: if provided by frontend (test mode), use it; else fall back to env var.
     """
-    resolved_key = (api_key or "").strip() or os.getenv("OPENAI_API_KEY", "").strip()
+    resolved_key = (api_key or "").strip() or os.getenv(PROVIDERS.get(provider, PROVIDERS["openai"])["env_key"], "")
 
     if not resolved_key or not _OPENAI_AVAILABLE:
+        return _stage_fallback(project_data, rules_triggered)
+
+    client, model = _make_client(provider, resolved_key)
+    if not client:
         return _stage_fallback(project_data, rules_triggered)
 
     current_stage = project_data.get("current_stage", "")
@@ -318,9 +354,8 @@ Generate stage-specific recommendation for "{stage}" using STATUS | BLOCKERS | A
 """.strip()
 
         try:
-            client   = OpenAI(api_key=resolved_key)
             response = client.chat.completions.create(
-                model       = "gpt-4o-mini",
+                model       = model,
                 messages    = [
                     {"role": "system", "content": STAGE_SYSTEM_PROMPT},
                     {"role": "user",   "content": user_prompt},
@@ -337,7 +372,7 @@ Generate stage-specific recommendation for "{stage}" using STATUS | BLOCKERS | A
                 "relation":     rel,
                 "text":         text,
                 "tokens_used":  tokens,
-                "model_used":   "gpt-4o-mini",
+                "model_used":   model,
             })
         except Exception as e:
             logger.error(f"Stage explain failed for {stage}: {e}")
@@ -365,14 +400,19 @@ def explain_overall(
     risk_category: str,
     expected_delay_label: str | None = None,
     api_key: str | None = None,
+    provider: str = "openai",
 ) -> dict:
     """
     Generate a comprehensive overall recommendation.
     api_key: if provided by frontend (test mode), use it; else fall back to env var.
     """
-    resolved_key = (api_key or "").strip() or os.getenv("OPENAI_API_KEY", "").strip()
+    resolved_key = (api_key or "").strip() or os.getenv(PROVIDERS.get(provider, PROVIDERS["openai"])["env_key"], "")
 
     if not resolved_key or not _OPENAI_AVAILABLE:
+        return _overall_fallback(project_data, rules_triggered)
+
+    client, model = _make_client(provider, resolved_key)
+    if not client:
         return _overall_fallback(project_data, rules_triggered)
 
     rule_chunks  = get_chunks_for_rules(rules_triggered)
@@ -412,9 +452,8 @@ Generate comprehensive overall recommendation using SUMMARY | CRITICAL ACTIONS |
 """.strip()
 
     try:
-        client   = OpenAI(api_key=resolved_key)
         response = client.chat.completions.create(
-            model       = "gpt-4o-mini",
+            model       = model,
             messages    = [
                 {"role": "system", "content": OVERALL_SYSTEM_PROMPT},
                 {"role": "user",   "content": user_prompt},
@@ -433,7 +472,7 @@ Generate comprehensive overall recommendation using SUMMARY | CRITICAL ACTIONS |
             "bottlenecks":      sections.get("BOTTLENECKS", ""),
             "outlook":          sections.get("OUTLOOK", ""),
             "full_text":        raw,
-            "model_used":       "gpt-4o-mini",
+            "model_used":       model,
             "tokens_used":      tokens,
         }
     except Exception as e:

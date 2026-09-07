@@ -349,12 +349,14 @@ def chat_with_project(
     current_user: CurrentUser,
     db: Session = Depends(get_db),
     x_openai_key: Optional[str] = Header(default=None, alias="X-OpenAI-Key"),
+    x_ai_provider: Optional[str] = Header(default="openai", alias="X-AI-Provider"),
 ):
     """
     Project-aware chat endpoint.
     - Loads full project data as system context
     - Accepts message history from frontend (stateless on backend)
-    - Uses GPT-4o-mini; falls back to rule-based reply if no key
+    - Provider: openai | nvidia | openrouter (via X-AI-Provider header)
+    - API key via X-OpenAI-Key header or env var
 
     Request body:
       { message: str, history: [{role, content}, ...] }
@@ -364,6 +366,7 @@ def chat_with_project(
     """
     import os
     from openai import OpenAI as _OAI
+    from app.services.openai_service import PROVIDERS, _make_client
 
     project = db.query(Project).filter(Project.project_id == project_id).first()
     if not project:
@@ -377,7 +380,9 @@ def chat_with_project(
     if current_user.role == UserRole.STATE and project.state != current_user.state:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    resolved_key = (x_openai_key or "").strip() or os.getenv("OPENAI_API_KEY", "").strip()
+    resolved_key = (x_openai_key or "").strip() or os.getenv(
+        PROVIDERS.get(x_ai_provider or "openai", PROVIDERS["openai"])["env_key"], ""
+    )
 
     # ── Fallback: no API key ──────────────────────────────────────────────────
     if not resolved_key:
@@ -408,9 +413,11 @@ def chat_with_project(
     messages.append({"role": "user", "content": body.message})
 
     try:
-        client   = _OAI(api_key=resolved_key)
+        client, model = _make_client(x_ai_provider or "openai", resolved_key)
+        if not client:
+            raise HTTPException(status_code=400, detail="Could not initialize AI client")
         response = client.chat.completions.create(
-            model       = "gpt-4o-mini",
+            model       = model,
             messages    = messages,
             temperature = 0.3,
             max_tokens  = 500,

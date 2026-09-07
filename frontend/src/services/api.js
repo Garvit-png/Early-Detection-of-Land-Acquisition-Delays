@@ -80,20 +80,25 @@ export const getActionCounts   = ()                => api.get('/actions/counts/s
 
 // ─── AI Explanation (OpenAI + RAG) ────────────────────────────────────────────
 // apiKey is optional — if provided it is sent as X-OpenAI-Key header (test mode)
-const _explainHeaders = (apiKey) =>
-  apiKey ? { headers: { 'X-OpenAI-Key': apiKey } } : {}
+// provider: 'openai' | 'nvidia' | 'openrouter'
+const _explainHeaders = (apiKey, provider = 'openai') => {
+  const headers = {}
+  if (apiKey)    headers['X-OpenAI-Key']  = apiKey
+  if (provider)  headers['X-AI-Provider'] = provider
+  return { headers }
+}
 
-export const getExplanation      = (projectId, apiKey) =>
-  api.post(`/explain/${projectId}`, {}, _explainHeaders(apiKey))
+export const getExplanation      = (projectId, apiKey, provider) =>
+  api.post(`/explain/${projectId}`, {}, _explainHeaders(apiKey, provider))
 
-export const getStageWiseExplanation = (projectId, apiKey) =>
-  api.post(`/explain/${projectId}/stage-wise`, {}, _explainHeaders(apiKey))
+export const getStageWiseExplanation = (projectId, apiKey, provider) =>
+  api.post(`/explain/${projectId}/stage-wise`, {}, _explainHeaders(apiKey, provider))
 
-export const getOverallExplanation   = (projectId, apiKey) =>
-  api.post(`/explain/${projectId}/overall`, {}, _explainHeaders(apiKey))
+export const getOverallExplanation   = (projectId, apiKey, provider) =>
+  api.post(`/explain/${projectId}/overall`, {}, _explainHeaders(apiKey, provider))
 
-export const chatWithProject = (projectId, message, history, apiKey) =>
-  api.post(`/explain/${projectId}/chat`, { message, history }, _explainHeaders(apiKey))
+export const chatWithProject = (projectId, message, history, apiKey, provider) =>
+  api.post(`/explain/${projectId}/chat`, { message, history }, _explainHeaders(apiKey, provider))
 
 // ─── MIS Export ───────────────────────────────────────────────────────────────
 export const exportCSV = (params = {}) => api.get('/dashboard/export/csv', {

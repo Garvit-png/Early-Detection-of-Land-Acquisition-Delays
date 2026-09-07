@@ -578,6 +578,7 @@ export default function ProjectDetailPage() {
   const [apiKey,     setApiKey]     = useState(() => localStorage.getItem('openai_api_key') || '')
   const [showApiKey, setShowApiKey] = useState(false)
   const [apiKeyInput,setApiKeyInput]= useState(() => localStorage.getItem('openai_api_key') || '')
+  const [aiProvider, setAiProvider] = useState(() => localStorage.getItem('ai_provider') || 'nvidia')
   const [loadingStage, setLoadingStage] = useState(false)
 
   // Stage click — in-place AI analysis
@@ -628,11 +629,19 @@ export default function ProjectDetailPage() {
     setShowApiKey(false)
   }
 
+  function changeProvider(p) {
+    localStorage.setItem('ai_provider', p)
+    setAiProvider(p)
+    // Reset chat so it reinitializes with new provider context
+    setChatHistory([])
+    setChatInitialized(false)
+  }
+
   async function handleExplain() {
     setExplaining(true)
     setTab('explanation')
     try {
-      const r = await getExplanation(id, apiKey || null)
+      const r = await getExplanation(id, apiKey || null, aiProvider)
       setExplanation(r.data)
     } catch(e) {
       setExplanation({ error: e.response?.data?.detail || e.message })
@@ -652,7 +661,7 @@ export default function ProjectDetailPage() {
   async function handleOverallExplain() {
     setExplainingOverall(true)
     try {
-      const r = await getOverallExplanation(id, apiKey || null)
+      const r = await getOverallExplanation(id, apiKey || null, aiProvider)
       setOverallExpl(r.data)
     } catch(e) {
       setOverallExpl({ error: e.response?.data?.detail || e.message })
@@ -667,7 +676,7 @@ export default function ProjectDetailPage() {
     if (stageAiResult[stageIdx]?.text) return
     setStageAiResult(prev => ({ ...prev, [stageIdx]: { loading: true } }))
     try {
-      const r = await getStageWiseExplanation(id, apiKey || null)
+      const r = await getStageWiseExplanation(id, apiKey || null, aiProvider)
       const stageRecs = r.data.stage_recommendations || []
       // Store all stages at once so future clicks are instant
       const mapped = {}
@@ -708,7 +717,7 @@ export default function ProjectDetailPage() {
     try {
       // Send history excluding the welcome message (index 0 if it's the AI greeting)
       const historyToSend = newHistory.slice(chatHistory[0]?.role === 'assistant' && !chatInitialized ? 0 : 0)
-      const r = await chatWithProject(id, msg, historyToSend.slice(0, -1), apiKey || null)
+      const r = await chatWithProject(id, msg, historyToSend.slice(0, -1), apiKey || null, aiProvider)
       setChatHistory(h => [...h, { role: 'assistant', content: r.data.reply }])
     } catch(e) {
       setChatHistory(h => [...h, { role: 'assistant', content: `Error: ${e.response?.data?.detail || e.message}` }])
@@ -836,25 +845,50 @@ export default function ProjectDetailPage() {
                   <span>{apiKey ? '🔑' : '⚠️'}</span>
                   <div>
                     <div style={{ fontSize:12, fontWeight:700, color: apiKey ? '#166534' : '#854d0e' }}>
-                      {apiKey ? 'GPT-4o-mini Active' : 'No API Key — Fallback Mode'}
+                      {apiKey ? 'API Key Set' : 'No API Key — Fallback Mode'}
                     </div>
                     <div style={{ fontSize:11, color: apiKey ? '#15803d' : '#a16207' }}>
                       {apiKey ? `sk-...${apiKey.slice(-6)} · Saved in browser`
-                        : 'Set OpenAI key for full AI analysis. Works in fallback mode too.'}
+                        : 'Set API key for full AI analysis. Works in fallback mode too.'}
                     </div>
                   </div>
                 </div>
-                <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                <div style={{ display:'flex', gap:6, flexShrink:0, alignItems:'center' }}>
+                  {/* Provider selector */}
+                  <div style={{ display:'flex', gap:4 }}>
+                    {[
+                      { id:'nvidia',     label:'NVIDIA',      hint:'Free · Nemotron 49B' },
+                      { id:'openai',     label:'OpenAI',      hint:'GPT-4o-mini · Paid' },
+                      { id:'openrouter', label:'OpenRouter',  hint:'Mistral 7B · Free' },
+                    ].map(p => (
+                      <button key={p.id} title={p.hint}
+                        onClick={() => changeProvider(p.id)}
+                        style={{
+                          padding:'3px 8px', borderRadius:4, fontSize:10, fontWeight:700, cursor:'pointer', border:'none',
+                          background: aiProvider === p.id ? 'var(--primary)' : 'var(--gray-200)',
+                          color:      aiProvider === p.id ? '#fff' : 'var(--gray-500)',
+                        }}>
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
                   {apiKey && <button className="btn btn-outline btn-sm" style={{ fontSize:10 }} onClick={clearApiKey}>Clear</button>}
                   <button className="btn btn-outline btn-sm" style={{ fontSize:10 }} onClick={() => setShowApiKey(v => !v)}>
                     {showApiKey ? 'Cancel' : apiKey ? 'Change' : 'Set Key'}
                   </button>
                 </div>
               </div>
+              {/* Provider hint */}
+              <div style={{ marginTop:6, fontSize:10, color:'var(--gray-500)' }}>
+                {aiProvider === 'nvidia'     && '🟢 NVIDIA Nemotron-49B — Free at build.nvidia.com → Get API Key → paste here'}
+                {aiProvider === 'openai'     && '🔵 OpenAI GPT-4o-mini — platform.openai.com (paid, ~$0.01/1K tokens)'}
+                {aiProvider === 'openrouter' && '🟣 OpenRouter Mistral-7B — openrouter.ai (free tier available)'}
+              </div>
               {showApiKey && (
                 <div style={{ marginTop:10, display:'flex', gap:8 }}>
                   <input type="password" className="form-input" style={{ flex:1, fontFamily:'var(--font-mono)', fontSize:12 }}
-                    placeholder="sk-proj-..." value={apiKeyInput}
+                    placeholder={aiProvider === 'nvidia' ? 'nvapi-...' : aiProvider === 'openrouter' ? 'sk-or-...' : 'sk-proj-...'}
+                    value={apiKeyInput}
                     onChange={e => setApiKeyInput(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && saveApiKey()} />
                   <button className="btn btn-primary btn-sm" onClick={saveApiKey} disabled={!apiKeyInput.trim()}>Save</button>
