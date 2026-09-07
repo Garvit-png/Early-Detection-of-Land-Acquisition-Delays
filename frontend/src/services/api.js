@@ -92,6 +92,9 @@ export const getStageWiseExplanation = (projectId, apiKey) =>
 export const getOverallExplanation   = (projectId, apiKey) =>
   api.post(`/explain/${projectId}/overall`, {}, _explainHeaders(apiKey))
 
+export const chatWithProject = (projectId, message, history, apiKey) =>
+  api.post(`/explain/${projectId}/chat`, { message, history }, _explainHeaders(apiKey))
+
 // ─── MIS Export ───────────────────────────────────────────────────────────────
 export const exportCSV = (params = {}) => api.get('/dashboard/export/csv', {
   params,

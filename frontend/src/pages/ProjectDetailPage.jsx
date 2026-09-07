@@ -8,7 +8,7 @@ import {
   getProject, scoreProject, updateProject,
   getRiskHistory, getSimilarProjects, getProjectActions,
   createAction, updateAction, getExplanation, getStageWisePrediction,
-  getStageWiseExplanation, getOverallExplanation,
+  getStageWiseExplanation, getOverallExplanation, chatWithProject,
 } from '../services/api'
 import { Icon } from '../components/shared/Icons'
 
@@ -150,7 +150,7 @@ function ShapChart({ factors }) {
 }
 
 // ─── Stage Timeline ───────────────────────────────────────────────────────────
-function StageTimeline({ project }) {
+function StageTimeline({ project, onStageClick, selectedStageIdx }) {
   const stageIdx = project.current_stage_index ?? 0
   const prob     = project.delay_probability ?? 0.5
   const stageData = STAGES.map((s, i) => {
@@ -168,27 +168,51 @@ function StageTimeline({ project }) {
       <div style={{ display:'flex', alignItems:'center', marginBottom:20, overflowX:'auto', paddingBottom:4 }}>
         {STAGES.map((s, i) => {
           const done = i < stageIdx, cur = i === stageIdx
+          const isSelected = selectedStageIdx === i
           return (
             <div key={i} style={{ display:'flex', alignItems:'center', flexShrink:0 }}>
-              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
-                <div style={{ width:28, height:28, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:11, background: done?'var(--success)':cur?'var(--primary)':'var(--gray-200)', color: done||cur?'#fff':'var(--gray-400)', boxShadow: cur?'0 0 0 3px var(--primary-light)':'none' }}>
+              <div
+                style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, cursor: onStageClick ? 'pointer' : 'default' }}
+                onClick={() => onStageClick && onStageClick(i, s)}
+                title={`Click for AI analysis: ${s}`}
+              >
+                <div style={{
+                  width:28, height:28, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+                  fontWeight:700, fontSize:11,
+                  background: isSelected ? '#7c3aed' : done ? 'var(--success)' : cur ? 'var(--primary)' : 'var(--gray-200)',
+                  color: done || cur || isSelected ? '#fff' : 'var(--gray-400)',
+                  boxShadow: isSelected ? '0 0 0 3px #ede9fe' : cur ? '0 0 0 3px var(--primary-light)' : 'none',
+                  transition: 'all .15s',
+                }}>
                   {done ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20,6 9,17 4,12"/></svg> : i+1}
                 </div>
-                <div style={{ fontSize:9, textAlign:'center', maxWidth:56, lineHeight:1.3, color:cur?'var(--primary)':done?'var(--success)':'var(--gray-400)', fontWeight:cur?700:500 }}>{s.replace(' ','\n')}</div>
+                <div style={{
+                  fontSize:9, textAlign:'center', maxWidth:56, lineHeight:1.3,
+                  color: isSelected ? '#7c3aed' : cur ? 'var(--primary)' : done ? 'var(--success)' : 'var(--gray-400)',
+                  fontWeight: isSelected || cur ? 700 : 500,
+                }}>{s.replace(' ','\n')}</div>
               </div>
               {i < STAGES.length-1 && <div style={{ width:28, height:2, margin:'0 4px', marginBottom:20, background: i<stageIdx?'var(--success)':'var(--gray-200)' }} />}
             </div>
           )
         })}
       </div>
+      {onStageClick && (
+        <div style={{ fontSize:10, color:'var(--gray-400)', marginBottom:8, textAlign:'center' }}>
+          Click any stage dot for AI analysis ↑
+        </div>
+      )}
       {/* Bar chart */}
       <ResponsiveContainer width="100%" height={140}>
-        <BarChart data={stageData} margin={{ top:4, right:8, bottom:20, left:0 }}>
+        <BarChart data={stageData} margin={{ top:4, right:8, bottom:20, left:0 }}
+          onClick={(data, index) => { if (onStageClick && data?.activeTooltipIndex != null) onStageClick(data.activeTooltipIndex, STAGES[data.activeTooltipIndex]) }}>
           <XAxis dataKey="stage" tick={{ fontSize:8 }} interval={0} axisLine={false} tickLine={false} height={36} />
           <YAxis domain={[0,100]} tick={{ fontSize:10 }} tickFormatter={v=>`${v}%`} axisLine={false} tickLine={false} width={32} />
           <Tooltip formatter={(v) => [`${v}%`, 'Delay Risk']} />
-          <Bar dataKey="risk" radius={[3,3,0,0]} maxBarSize={40}>
-            {stageData.map((e,i) => <Cell key={i} fill={barColor(e)} opacity={e.completed?0.5:1} />)}
+          <Bar dataKey="risk" radius={[3,3,0,0]} maxBarSize={40} style={{ cursor: onStageClick ? 'pointer' : 'default' }}>
+            {stageData.map((e,i) => (
+              <Cell key={i} fill={selectedStageIdx===i ? '#7c3aed' : barColor(e)} opacity={e.completed?0.5:1} />
+            ))}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
@@ -556,6 +580,17 @@ export default function ProjectDetailPage() {
   const [apiKeyInput,setApiKeyInput]= useState(() => localStorage.getItem('openai_api_key') || '')
   const [loadingStage, setLoadingStage] = useState(false)
 
+  // Stage click — in-place AI analysis
+  const [selectedStageIdx,  setSelectedStageIdx]  = useState(null)
+  const [selectedStageName, setSelectedStageName] = useState(null)
+  const [stageAiResult,     setStageAiResult]     = useState({}) // {stageIdx: {text, model, loading, error}}
+
+  // Chat state
+  const [chatHistory,   setChatHistory]   = useState([])  // [{role, content}]
+  const [chatInput,     setChatInput]     = useState('')
+  const [chatLoading,   setChatLoading]   = useState(false)
+  const [chatInitialized, setChatInitialized] = useState(false)
+
   const user = JSON.parse(localStorage.getItem('user') || '{}')
 
   const loadAll = useCallback(() => {
@@ -624,6 +659,62 @@ export default function ProjectDetailPage() {
     } finally { setExplainingOverall(false) }
   }
 
+  // Stage dot/bar click — fetch AI analysis for that specific stage in-place
+  async function handleStageClick(stageIdx, stageName) {
+    setSelectedStageIdx(stageIdx)
+    setSelectedStageName(stageName)
+    // If already loaded, just show it
+    if (stageAiResult[stageIdx]?.text) return
+    setStageAiResult(prev => ({ ...prev, [stageIdx]: { loading: true } }))
+    try {
+      const r = await getStageWiseExplanation(id, apiKey || null)
+      const stageRecs = r.data.stage_recommendations || []
+      // Store all stages at once so future clicks are instant
+      const mapped = {}
+      stageRecs.forEach(s => {
+        mapped[s.stage_index] = { text: s.text, model: s.model_used, relation: s.relation, loading: false }
+      })
+      setStageAiResult(mapped)
+    } catch(e) {
+      setStageAiResult(prev => ({ ...prev, [stageIdx]: { error: e.response?.data?.detail || e.message, loading: false } }))
+    }
+  }
+
+  // Chat: initialize with project summary then open chat tab
+  async function initChat() {
+    if (chatInitialized) { setTab('explanation'); return }
+    setChatLoading(true)
+    setChatInitialized(true)
+    setTab('explanation')
+    const welcomeMsg = {
+      role: 'assistant',
+      content: `Namaste! I've read the full details of **${id}**.\n\n` +
+        `Risk Score: **${project.risk_score ?? 'Not scored'}/100** (${project.risk_category ?? 'N/A'})\n` +
+        `Current Stage: **${project.current_stage ?? 'Unknown'}**\n` +
+        (project.rules_triggered?.length ? `Triggered Rules: ${project.rules_triggered.join(', ')}\n` : '') +
+        `\nAsk me anything about this project — risks, recommendations, legal basis, or specific stages.`,
+    }
+    setChatHistory([welcomeMsg])
+    setChatLoading(false)
+  }
+
+  async function sendChatMessage(msg) {
+    if (!msg.trim()) return
+    const userMsg = { role: 'user', content: msg }
+    const newHistory = [...chatHistory, userMsg]
+    setChatHistory(newHistory)
+    setChatInput('')
+    setChatLoading(true)
+    try {
+      // Send history excluding the welcome message (index 0 if it's the AI greeting)
+      const historyToSend = newHistory.slice(chatHistory[0]?.role === 'assistant' && !chatInitialized ? 0 : 0)
+      const r = await chatWithProject(id, msg, historyToSend.slice(0, -1), apiKey || null)
+      setChatHistory(h => [...h, { role: 'assistant', content: r.data.reply }])
+    } catch(e) {
+      setChatHistory(h => [...h, { role: 'assistant', content: `Error: ${e.response?.data?.detail || e.message}` }])
+    } finally { setChatLoading(false) }
+  }
+
   async function handleStageWise() {
     setLoadingStage(true)
     try {
@@ -667,9 +758,9 @@ export default function ProjectDetailPage() {
           <button className="btn btn-outline" onClick={() => setShowEdit(true)}>
             Edit Details
           </button>
-          <button className="btn btn-outline" onClick={handleExplain} disabled={explaining || !project.risk_score}
+          <button className="btn btn-outline" onClick={initChat} disabled={!project.risk_score}
             style={{ background: tab==='explanation' ? 'var(--primary-light)' : '' }}>
-            {explaining ? 'Explaining…' : 'AI Explain'}
+            💬 AI Chat
           </button>
           <button className="btn btn-primary" onClick={handleScore} disabled={scoring}>
             <Icon.Refresh />{scoring ? 'Scoring…' : 'Re-score'}
@@ -733,220 +824,227 @@ export default function ProjectDetailPage() {
 
       {/* ── Tab: AI Explanation ── */}
       {tab === 'explanation' && (
-        <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 300px', gap:20, alignItems:'start' }}>
 
-          {/* ── API Key Panel (Test Mode) ── */}
-          <div className="card" style={{ padding:'14px 20px', background: apiKey ? '#f0fdf4' : '#fefce8', border: `1px solid ${apiKey ? '#86efac' : '#fde047'}` }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                <span style={{ fontSize:18 }}>{apiKey ? '🔑' : '⚠️'}</span>
-                <div>
-                  <div style={{ fontSize:12, fontWeight:700, color: apiKey ? '#166534' : '#854d0e' }}>
-                    {apiKey ? 'OpenAI API Key Set (Test Mode)' : 'No API Key — Using Rule-based Fallback'}
-                  </div>
-                  <div style={{ fontSize:11, color: apiKey ? '#15803d' : '#a16207' }}>
-                    {apiKey
-                      ? `Key: sk-...${apiKey.slice(-8)} · Stored in browser`
-                      : 'Enter your OpenAI API key to enable GPT-4o-mini explanations. Key is stored only in your browser.'}
+          {/* ── Main chat area ── */}
+          <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
+
+            {/* API Key Panel */}
+            <div style={{ marginBottom:12, padding:'10px 16px', borderRadius:'var(--radius)', background: apiKey ? '#f0fdf4' : '#fefce8', border:`1px solid ${apiKey ? '#86efac' : '#fde047'}` }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span>{apiKey ? '🔑' : '⚠️'}</span>
+                  <div>
+                    <div style={{ fontSize:12, fontWeight:700, color: apiKey ? '#166534' : '#854d0e' }}>
+                      {apiKey ? 'GPT-4o-mini Active' : 'No API Key — Fallback Mode'}
+                    </div>
+                    <div style={{ fontSize:11, color: apiKey ? '#15803d' : '#a16207' }}>
+                      {apiKey ? `sk-...${apiKey.slice(-6)} · Saved in browser`
+                        : 'Set OpenAI key for full AI analysis. Works in fallback mode too.'}
+                    </div>
                   </div>
                 </div>
+                <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                  {apiKey && <button className="btn btn-outline btn-sm" style={{ fontSize:10 }} onClick={clearApiKey}>Clear</button>}
+                  <button className="btn btn-outline btn-sm" style={{ fontSize:10 }} onClick={() => setShowApiKey(v => !v)}>
+                    {showApiKey ? 'Cancel' : apiKey ? 'Change' : 'Set Key'}
+                  </button>
+                </div>
               </div>
-              <div style={{ display:'flex', gap:8, flexShrink:0 }}>
-                {apiKey && <button className="btn btn-outline btn-sm" style={{ fontSize:11 }} onClick={clearApiKey}>Clear Key</button>}
-                <button className="btn btn-outline btn-sm" style={{ fontSize:11 }} onClick={() => setShowApiKey(v => !v)}>
-                  {showApiKey ? 'Cancel' : apiKey ? 'Change Key' : 'Set API Key'}
+              {showApiKey && (
+                <div style={{ marginTop:10, display:'flex', gap:8 }}>
+                  <input type="password" className="form-input" style={{ flex:1, fontFamily:'var(--font-mono)', fontSize:12 }}
+                    placeholder="sk-proj-..." value={apiKeyInput}
+                    onChange={e => setApiKeyInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && saveApiKey()} />
+                  <button className="btn btn-primary btn-sm" onClick={saveApiKey} disabled={!apiKeyInput.trim()}>Save</button>
+                </div>
+              )}
+            </div>
+
+            {/* Chat window */}
+            <div className="card" style={{ padding:0, overflow:'hidden', display:'flex', flexDirection:'column', minHeight:500 }}>
+
+              {/* Chat header */}
+              <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--gray-200)', background:'var(--gray-50)', display:'flex', alignItems:'center', gap:10 }}>
+                <span style={{ fontSize:20 }}>🤖</span>
+                <div>
+                  <div style={{ fontWeight:700, fontSize:13 }}>Project AI Advisor</div>
+                  <div style={{ fontSize:11, color:'var(--gray-400)' }}>
+                    Knows full details of {project.project_id} · {project.project_name}
+                  </div>
+                </div>
+                {chatHistory.length > 0 && (
+                  <button className="btn btn-ghost btn-sm" style={{ marginLeft:'auto', fontSize:11 }}
+                    onClick={() => { setChatHistory([]); setChatInitialized(false) }}>
+                    Clear chat
+                  </button>
+                )}
+              </div>
+
+              {/* Messages */}
+              <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:12, maxHeight:480 }}>
+                {chatHistory.length === 0 && !chatLoading && (
+                  <div style={{ textAlign:'center', padding:'40px 20px' }}>
+                    <div style={{ fontSize:32, marginBottom:12 }}>💬</div>
+                    <div style={{ fontSize:14, fontWeight:600, color:'var(--gray-700)', marginBottom:8 }}>
+                      Ask anything about this project
+                    </div>
+                    <div style={{ fontSize:12, color:'var(--gray-400)', marginBottom:20 }}>
+                      I've read all project data — risks, stages, financials, legal status.
+                    </div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:8, justifyContent:'center' }}>
+                      {[
+                        'Why is this project high risk?',
+                        'What should I do first?',
+                        'Explain the legal issues',
+                        'How long will delays last?',
+                        'What does R-01 mean here?',
+                      ].map(q => (
+                        <button key={q} className="btn btn-outline btn-sm" style={{ fontSize:11 }}
+                          onClick={() => sendChatMessage(q)}>
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {chatHistory.map((msg, i) => (
+                  <div key={i} style={{
+                    display:'flex', flexDirection:'column',
+                    alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                  }}>
+                    <div style={{
+                      maxWidth:'80%', padding:'10px 14px', borderRadius:12,
+                      borderBottomRightRadius: msg.role === 'user' ? 2 : 12,
+                      borderBottomLeftRadius:  msg.role === 'assistant' ? 2 : 12,
+                      background: msg.role === 'user' ? 'var(--primary)' : 'var(--gray-100)',
+                      color: msg.role === 'user' ? '#fff' : 'var(--gray-800)',
+                      fontSize:13, lineHeight:1.7, whiteSpace:'pre-wrap',
+                    }}>
+                      {msg.content}
+                    </div>
+                    <div style={{ fontSize:10, color:'var(--gray-300)', marginTop:2, paddingLeft:4 }}>
+                      {msg.role === 'user' ? 'You' : 'AI Advisor'}
+                    </div>
+                  </div>
+                ))}
+
+                {chatLoading && (
+                  <div style={{ display:'flex', alignItems:'flex-start', gap:8 }}>
+                    <div style={{ padding:'10px 14px', borderRadius:12, borderBottomLeftRadius:2, background:'var(--gray-100)' }}>
+                      <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                        <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--gray-400)', animation:'pulse 1s infinite' }} />
+                        <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--gray-400)', animation:'pulse 1s .2s infinite' }} />
+                        <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--gray-400)', animation:'pulse 1s .4s infinite' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Input area */}
+              <div style={{ padding:'12px 16px', borderTop:'1px solid var(--gray-200)', display:'flex', gap:8 }}>
+                <input
+                  className="form-input"
+                  style={{ flex:1, fontSize:13 }}
+                  placeholder="Ask about this project… (Press Enter to send)"
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !chatLoading) { e.preventDefault(); sendChatMessage(chatInput) } }}
+                  disabled={chatLoading}
+                />
+                <button className="btn btn-primary" onClick={() => sendChatMessage(chatInput)}
+                  disabled={chatLoading || !chatInput.trim()}>
+                  Send
                 </button>
               </div>
             </div>
 
-            {showApiKey && (
-              <div style={{ marginTop:12, display:'flex', gap:8, alignItems:'center' }}>
-                <input
-                  type="password"
-                  className="form-input"
-                  style={{ flex:1, fontFamily:'var(--font-mono)', fontSize:12 }}
-                  placeholder="sk-proj-..."
-                  value={apiKeyInput}
-                  onChange={e => setApiKeyInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && saveApiKey()}
-                />
-                <button className="btn btn-primary btn-sm" onClick={saveApiKey} disabled={!apiKeyInput.trim()}>
-                  Save & Use
-                </button>
+            {/* Quick analysis buttons below chat */}
+            <div style={{ marginTop:12, display:'flex', gap:8, flexWrap:'wrap' }}>
+              <span style={{ fontSize:11, color:'var(--gray-400)', alignSelf:'center' }}>Quick analysis:</span>
+              <button className="btn btn-outline btn-sm" style={{ fontSize:11 }} onClick={handleExplain} disabled={explaining || !project.risk_score}>
+                {explaining ? '…' : '🔍 Risk Explanation'}
+              </button>
+              <button className="btn btn-outline btn-sm" style={{ fontSize:11 }} onClick={handleOverallExplain} disabled={explainingOverall || !project.risk_score}>
+                {explainingOverall ? '…' : '📋 Overall Recs'}
+              </button>
+            </div>
+
+            {/* Quick analysis results */}
+            {(explaining || explanation || explainingOverall || overallExpl) && (
+              <div style={{ marginTop:12, display:'flex', flexDirection:'column', gap:12 }}>
+                {explaining && <LoadingCard text="Generating risk explanation…" />}
+                {explanation?.error && <ErrorCard msg={explanation.error} />}
+                {explanation && !explanation.error && !explaining && (
+                  <div className="card">
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                      <div className="detail-section-title" style={{ margin:0 }}>🔍 Risk Explanation</div>
+                      <ModelBadge model={explanation.model_used} tokens={explanation.tokens_used} chunks={explanation.kb_chunks_used} />
+                    </div>
+                    {explanation.why      && <ExplainSection title="Why This Risk Score" color="var(--danger)"  text={explanation.why} />}
+                    {explanation.actions  && <ExplainSection title="Recommended Actions"  color="var(--warning)" text={explanation.actions} />}
+                    {explanation.legal_basis && <ExplainSection title="Legal Basis" color="var(--primary)" text={explanation.legal_basis} footer="LARR Act 2013 · CAG Audit Reports" />}
+                  </div>
+                )}
+                {explainingOverall && <LoadingCard text="Generating overall recommendations…" />}
+                {overallExpl?.error && <ErrorCard msg={overallExpl.error} />}
+                {overallExpl && !overallExpl.error && !explainingOverall && (
+                  <div className="card">
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                      <div className="detail-section-title" style={{ margin:0 }}>📋 Overall Recommendations</div>
+                      <ModelBadge model={overallExpl.model_used} tokens={overallExpl.tokens_used} />
+                    </div>
+                    {overallExpl.summary          && <ExplainSection title="Summary"          color="var(--primary)" text={overallExpl.summary} />}
+                    {overallExpl.critical_actions && <ExplainSection title="Critical Actions"  color="var(--danger)"  text={overallExpl.critical_actions} />}
+                    {overallExpl.bottlenecks      && <ExplainSection title="Bottlenecks"       color="var(--warning)" text={overallExpl.bottlenecks} />}
+                    {overallExpl.outlook          && <ExplainSection title="Outlook"           color="var(--success)" text={overallExpl.outlook} />}
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          {/* ── Three action buttons ── */}
-          <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
-            <button className="btn btn-primary" onClick={handleExplain}
-              disabled={explaining || !project.risk_score}>
-              {explaining ? <><div className="spinner-sm" />Explaining…</> : '🔍 Risk Explanation (WHY)'}
-            </button>
-            <button className="btn btn-outline" onClick={handleOverallExplain}
-              disabled={explainingOverall || !project.risk_score}>
-              {explainingOverall ? <><div className="spinner-sm" />Generating…</> : '📋 Overall Recommendations'}
-            </button>
-            <button className="btn btn-outline" onClick={handleStageWiseExplain}
-              disabled={explainingStage || !project.risk_score}>
-              {explainingStage ? <><div className="spinner-sm" />Analysing…</> : '📊 Per-Stage Analysis'}
-            </button>
-          </div>
-
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 300px', gap:20, alignItems:'start' }}>
-            <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-
-              {/* ── Risk Explanation (original WHY/ACTIONS/LEGAL) ── */}
-              {explaining && <LoadingCard text="Querying AI for risk explanation…" />}
-              {explanation?.error && <ErrorCard msg={explanation.error} />}
-              {explanation && !explanation.error && !explaining && (
-                <div className="card">
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-                    <div className="detail-section-title" style={{ margin:0 }}>🔍 Risk Explanation</div>
-                    <ModelBadge model={explanation.model_used} tokens={explanation.tokens_used} chunks={explanation.kb_chunks_used} />
+          {/* ── Right sidebar ── */}
+          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+            {/* Project quick stats */}
+            <div className="card" style={{ padding:'14px 16px' }}>
+              <div className="detail-section-title">Project Snapshot</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {[
+                  { label:'Risk Score', value:`${project.risk_score ?? '—'}/100`, color: project.risk_score >= 70 ? 'var(--danger)' : project.risk_score >= 40 ? 'var(--warning)' : 'var(--success)' },
+                  { label:'Stage', value: project.current_stage },
+                  { label:'Compensation', value:`${project.compensation_pct ?? '—'}%` },
+                  { label:'R&R', value:`${project.rr_completion_pct ?? '—'}%` },
+                  { label:'Legal Cases', value: project.num_legal_cases },
+                  { label:'Days No Action', value:`${project.days_since_last_action ?? '—'}d` },
+                ].map(f => (
+                  <div key={f.label} style={{ display:'flex', justifyContent:'space-between', fontSize:12 }}>
+                    <span style={{ color:'var(--gray-500)' }}>{f.label}</span>
+                    <span style={{ fontWeight:700, color: f.color || 'var(--gray-800)' }}>{f.value ?? '—'}</span>
                   </div>
-                  {explanation.why && (
-                    <ExplainSection title="Why This Risk Score" color="var(--danger)" text={explanation.why} />
-                  )}
-                  {explanation.actions && (
-                    <ExplainSection title="Recommended Actions" color="var(--warning)" text={explanation.actions} />
-                  )}
-                  {explanation.legal_basis && (
-                    <ExplainSection title="Legal Basis (LARR Act / CAG Audit)" color="var(--primary)" text={explanation.legal_basis} footer="Sources: LARR Act 2013 · CAG Audit Reports" />
-                  )}
-                  {explanation.sources?.length > 0 && (
-                    <div style={{ marginTop:8, fontSize:11, color:'var(--gray-400)' }}>
-                      Citations: {explanation.sources.join(', ')}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ── Overall Recommendations ── */}
-              {explainingOverall && <LoadingCard text="Generating comprehensive overall recommendations…" />}
-              {overallExpl?.error && <ErrorCard msg={overallExpl.error} />}
-              {overallExpl && !overallExpl.error && !explainingOverall && (
-                <div className="card">
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-                    <div className="detail-section-title" style={{ margin:0 }}>📋 Overall Recommendations</div>
-                    <ModelBadge model={overallExpl.model_used} tokens={overallExpl.tokens_used} />
-                  </div>
-                  {overallExpl.summary && (
-                    <ExplainSection title="Executive Summary" color="var(--primary)" text={overallExpl.summary} />
-                  )}
-                  {overallExpl.critical_actions && (
-                    <ExplainSection title="Critical Actions (Priority Order)" color="var(--danger)" text={overallExpl.critical_actions} />
-                  )}
-                  {overallExpl.bottlenecks && (
-                    <ExplainSection title="Key Bottlenecks" color="var(--warning)" text={overallExpl.bottlenecks} />
-                  )}
-                  {overallExpl.outlook && (
-                    <ExplainSection title="Outlook & Timeline" color="var(--success)" text={overallExpl.outlook} />
-                  )}
-                </div>
-              )}
-
-              {/* ── Per-Stage Analysis ── */}
-              {explainingStage && <LoadingCard text="Running per-stage AI analysis for all 6 acquisition stages…" />}
-              {stageExplanation?.error && <ErrorCard msg={stageExplanation.error} />}
-              {stageExplanation && !stageExplanation.error && !explainingStage && (
-                <div className="card">
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-                    <div className="detail-section-title" style={{ margin:0 }}>📊 Per-Stage Analysis</div>
-                    <ModelBadge model={stageExplanation.model_used} tokens={stageExplanation.total_tokens} />
-                  </div>
-                  {(stageExplanation.stage_recommendations || []).map((s, i) => {
-                    const relColor = s.relation === 'current' ? 'var(--primary)'
-                      : s.relation === 'past' ? 'var(--success)' : 'var(--gray-400)'
-                    const relBg = s.relation === 'current' ? 'var(--primary-light)'
-                      : s.relation === 'past' ? '#f0fdf4' : 'var(--gray-50)'
-                    const statusLine = s.text?.split('\n')[0] || ''
-                    const isCritical = statusLine.toUpperCase().includes('CRITICAL')
-                    const isDelayed  = statusLine.toUpperCase().includes('DELAYED')
-                    return (
-                      <details key={i} style={{
-                        marginBottom:8, borderRadius:'var(--radius)',
-                        border:`1px solid ${s.relation==='current' ? 'var(--primary)' : 'var(--gray-200)'}`,
-                        background: relBg, overflow:'hidden',
-                      }}>
-                        <summary style={{
-                          padding:'10px 14px', cursor:'pointer', userSelect:'none',
-                          display:'flex', alignItems:'center', gap:10, listStyle:'none',
-                          fontWeight: s.relation === 'current' ? 700 : 500,
-                        }}>
-                          <span style={{
-                            width:22, height:22, borderRadius:'50%', flexShrink:0,
-                            display:'flex', alignItems:'center', justifyContent:'center',
-                            background: relColor, color:'#fff', fontSize:10, fontWeight:700,
-                          }}>{i + 1}</span>
-                          <span style={{ flex:1, fontSize:13, color:'var(--gray-800)' }}>{s.stage_name}</span>
-                          {s.relation === 'current' && (
-                            <span style={{ fontSize:9, background:'var(--primary)', color:'#fff', padding:'2px 6px', borderRadius:3, fontWeight:700 }}>CURRENT</span>
-                          )}
-                          {isCritical && <span style={{ fontSize:9, background:'var(--danger)', color:'#fff', padding:'2px 6px', borderRadius:3 }}>CRITICAL</span>}
-                          {isDelayed && !isCritical && <span style={{ fontSize:9, background:'var(--warning)', color:'#fff', padding:'2px 6px', borderRadius:3 }}>DELAYED</span>}
-                          {s.relation === 'past' && <span style={{ fontSize:9, background:'var(--success)', color:'#fff', padding:'2px 6px', borderRadius:3 }}>DONE</span>}
-                          {s.relation === 'future' && <span style={{ fontSize:9, background:'var(--gray-300)', color:'var(--gray-700)', padding:'2px 6px', borderRadius:3 }}>UPCOMING</span>}
-                          <ModelBadge model={s.model_used} tiny />
-                        </summary>
-                        <div style={{ padding:'12px 14px', borderTop:'1px solid var(--gray-200)', fontSize:13, color:'var(--gray-700)', lineHeight:1.8, whiteSpace:'pre-wrap', background:'#fff' }}>
-                          {s.text}
-                        </div>
-                      </details>
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* Empty state */}
-              {!explanation && !overallExpl && !stageExplanation && !explaining && !explainingOverall && !explainingStage && (
-                <div className="card" style={{ padding:48, textAlign:'center' }}>
-                  <div style={{ fontSize:32, marginBottom:12 }}>🤖</div>
-                  <div style={{ fontSize:14, fontWeight:600, color:'var(--gray-700)', marginBottom:8 }}>
-                    AI-Powered Recommendations
-                  </div>
-                  <div style={{ fontSize:13, color:'var(--gray-500)', marginBottom:20, maxWidth:400, margin:'0 auto 20px' }}>
-                    Get grounded analysis citing LARR Act 2013 provisions and CAG audit findings.
-                    {!apiKey && ' Set your OpenAI API key above for GPT-4o-mini analysis.'}
-                  </div>
-                  <div style={{ display:'flex', gap:10, justifyContent:'center', flexWrap:'wrap' }}>
-                    <button className="btn btn-primary" onClick={handleExplain} disabled={!project.risk_score}>
-                      🔍 Risk Explanation
-                    </button>
-                    <button className="btn btn-outline" onClick={handleOverallExplain} disabled={!project.risk_score}>
-                      📋 Overall Recommendations
-                    </button>
-                    <button className="btn btn-outline" onClick={handleStageWiseExplain} disabled={!project.risk_score}>
-                      📊 Per-Stage Analysis
-                    </button>
-                  </div>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
 
-            {/* ── Right sidebar: KB sources ── */}
-            <div className="card" style={{ alignSelf:'flex-start', position:'sticky', top:20 }}>
-              <div className="detail-section-title">Knowledge Base Sources</div>
+            {/* Knowledge base sources */}
+            <div className="card" style={{ padding:'14px 16px' }}>
+              <div className="detail-section-title">Knowledge Base</div>
               {[
-                { id:'LARR Act 2013', desc:'Legal framework for land acquisition, compensation & R&R', url:'https://www.indiacode.nic.in/' },
-                { id:'CAG MP Report', desc:'Audit findings: compensation delays, award overdue, record issues', url:'https://cag.gov.in/' },
-                { id:'CAG Telangana', desc:'Cross-state delay evidence, staffing & coordination issues', url:'https://cag.gov.in/' },
-                { id:'R-01 to R-08', desc:'8 prototype recommendation rules from SIH KB', url:'' },
-                { id:'FM-01 to FM-14', desc:'14 feature mappings with evidence strength ratings', url:'' },
-                { id:'LIFE-01..10', desc:'Lifecycle stage signals and delay indicators', url:'' },
-                { id:'ADMIN-01..10', desc:'Administrative bottleneck patterns and actions', url:'' },
+                { id:'LARR Act 2013', url:'https://www.indiacode.nic.in/' },
+                { id:'CAG MP Report', url:'https://cag.gov.in/' },
+                { id:'R-01 to R-08', url:'' },
+                { id:'FM-01 to FM-14', url:'' },
+                { id:'LIFE + ADMIN', url:'' },
               ].map(s => (
-                <div key={s.id} style={{ display:'flex', flexDirection:'column', padding:'8px 0', borderBottom:'1px solid var(--gray-100)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                    <span style={{ fontSize:11, fontWeight:700, fontFamily:'var(--font-mono)', color:'var(--primary)' }}>{s.id}</span>
-                    {s.url && <a href={s.url} target="_blank" rel="noreferrer" style={{ fontSize:10, color:'var(--primary)', textDecoration:'none' }}>↗</a>}
-                  </div>
-                  <span style={{ fontSize:11, color:'var(--gray-500)', marginTop:2 }}>{s.desc}</span>
+                <div key={s.id} style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', borderBottom:'1px solid var(--gray-100)', fontSize:11 }}>
+                  <span style={{ fontFamily:'var(--font-mono)', color:'var(--primary)', fontWeight:700 }}>{s.id}</span>
+                  {s.url && <a href={s.url} target="_blank" rel="noreferrer" style={{ color:'var(--primary)', textDecoration:'none' }}>↗</a>}
                 </div>
               ))}
-              <div style={{ marginTop:12, fontSize:11, color:'var(--gray-400)', lineHeight:1.5 }}>
-                72 KB chunks · 4 knowledge-base files · Retrieved contextually per triggered rules + stage.
-              </div>
+              <div style={{ marginTop:8, fontSize:10, color:'var(--gray-400)' }}>72 KB chunks · 4 files</div>
             </div>
           </div>
         </div>
@@ -964,7 +1062,64 @@ export default function ProjectDetailPage() {
                   {loadingStage ? 'Running…' : 'Run Stage ML'}
                 </button>
               </div>
-              <StageTimeline project={project} />
+              <StageTimeline project={project} onStageClick={handleStageClick} selectedStageIdx={selectedStageIdx} />
+
+              {/* In-place stage AI analysis */}
+              {selectedStageIdx !== null && (
+                <div style={{ marginTop:16, borderRadius:'var(--radius)', border:'2px solid #7c3aed', overflow:'hidden' }}>
+                  <div style={{ background:'#7c3aed', padding:'10px 16px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <span style={{ fontSize:18 }}>🔍</span>
+                      <span style={{ fontWeight:700, fontSize:13, color:'#fff' }}>
+                        AI Analysis: {selectedStageName}
+                      </span>
+                      {stageAiResult[selectedStageIdx]?.relation && (
+                        <span style={{ fontSize:10, background:'rgba(255,255,255,.2)', color:'#fff', padding:'1px 7px', borderRadius:3 }}>
+                          {stageAiResult[selectedStageIdx].relation.toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <button onClick={() => setSelectedStageIdx(null)}
+                      style={{ background:'none', border:'none', color:'rgba(255,255,255,.7)', cursor:'pointer', fontSize:18, lineHeight:1 }}>×</button>
+                  </div>
+                  <div style={{ padding:16, background:'#faf5ff' }}>
+                    {stageAiResult[selectedStageIdx]?.loading && (
+                      <div style={{ display:'flex', alignItems:'center', gap:10, color:'var(--gray-500)', fontSize:13 }}>
+                        <div className="spinner" style={{ width:16, height:16 }} />
+                        Fetching AI analysis for all stages…
+                      </div>
+                    )}
+                    {stageAiResult[selectedStageIdx]?.error && (
+                      <div style={{ color:'var(--danger)', fontSize:12 }}>{stageAiResult[selectedStageIdx].error}</div>
+                    )}
+                    {stageAiResult[selectedStageIdx]?.text && !stageAiResult[selectedStageIdx]?.loading && (
+                      <>
+                        <div style={{ fontSize:13, color:'var(--gray-700)', lineHeight:1.8, whiteSpace:'pre-wrap' }}>
+                          {stageAiResult[selectedStageIdx].text}
+                        </div>
+                        <div style={{ marginTop:10, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                          <ModelBadge model={stageAiResult[selectedStageIdx].model} />
+                          <div style={{ display:'flex', gap:8 }}>
+                            {STAGES.map((s, i) => (
+                              <button key={i} onClick={() => { setSelectedStageIdx(i); setSelectedStageName(s) }}
+                                style={{ width:22, height:22, borderRadius:'50%', border:'none', cursor:'pointer', fontSize:9, fontWeight:700,
+                                  background: i === selectedStageIdx ? '#7c3aed' : stageAiResult[i] ? 'var(--success)' : 'var(--gray-200)',
+                                  color: i === selectedStageIdx || stageAiResult[i] ? '#fff' : 'var(--gray-500)',
+                                }} title={s}>{i+1}</button>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {!stageAiResult[selectedStageIdx] && (
+                      <div style={{ display:'flex', alignItems:'center', gap:10, color:'var(--gray-500)', fontSize:13 }}>
+                        <div className="spinner" style={{ width:16, height:16 }} />
+                        Loading…
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {stageData && (
                 <div style={{ marginTop:20 }}>

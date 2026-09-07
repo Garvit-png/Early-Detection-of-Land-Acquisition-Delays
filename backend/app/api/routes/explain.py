@@ -242,3 +242,188 @@ def get_overall_explanation(
         "tokens_used":      result.get("tokens_used",      0),
         "generated_at":     datetime.now(timezone.utc).isoformat(),
     }
+
+
+# ─── Project-aware Chat endpoint ─────────────────────────────────────────────
+
+from pydantic import BaseModel
+
+class ChatMessage(BaseModel):
+    role: str   # "user" or "assistant"
+    content: str
+
+class ChatRequest(BaseModel):
+    message: str
+    history: list[ChatMessage] = []   # previous turns sent from frontend
+
+
+CHAT_SYSTEM_PROMPT = """You are an expert advisor on Indian land acquisition law (LARR Act 2013), \
+infrastructure project governance, and CAG audit findings.
+
+You have been given full details of a specific land acquisition project. \
+Your job is to help the government officer understand the project's risks, \
+recommend actions, answer questions, and provide grounded advice.
+
+Rules:
+1. Always ground your answers in the project data provided in the system context.
+2. Cite rule IDs [R-01..R-08] and KB references [LARR-xx], [CAG-xx] where relevant.
+3. Be concise and practical — the user is a district/state government officer.
+4. If asked something not related to this project or land acquisition, \
+   politely redirect to the project.
+5. Never invent data — only use what is in the project context below.
+"""
+
+
+def _build_chat_system_context(project: "Project") -> str:
+    """Build a rich system message with full project details for the chat."""
+    p = project
+    rules = p.rules_triggered or []
+    shap  = p.shap_factors    or []
+    recs  = p.recommendations or []
+
+    top_shap = "\n".join(
+        f"  - {f['display_name']}: {f['shap_value']:+.3f} ({f['direction'].replace('_',' ')})"
+        for f in shap[:6]
+    ) or "  N/A"
+
+    top_recs = "\n".join(f"  {i+1}. {r}" for i, r in enumerate(recs[:4])) or "  None"
+
+    return f"""=== PROJECT CONTEXT ===
+ID: {p.project_id} | Name: {p.project_name}
+Type: {p.project_type} | State: {p.state} | District: {p.district}
+Current Stage: {p.current_stage} (index {p.current_stage_index})
+Start Date: {p.start_date}
+
+RISK ASSESSMENT:
+  Risk Score: {p.risk_score}/100 | Category: {p.risk_category.value if p.risk_category else 'N/A'}
+  Delay Probability: {round((p.delay_probability or 0)*100, 1)}%
+  Expected Delay: {p.expected_delay_label or 'Not computed'}
+  Rules Triggered: {', '.join(rules) or 'None'}
+
+KEY METRICS:
+  Compensation disbursed: {p.compensation_pct}%
+  R&R completion: {p.rr_completion_pct}%
+  Documentation: {p.documentation_pct}%
+  Stakeholder response: {p.stakeholder_response_pct}%
+  Possession: {p.possession_pct}%
+  Funding readiness: {p.funding_readiness}%
+  Notice delivery: {p.notice_delivery_pct}%
+  Mutation completion: {p.mutation_completion_pct}%
+
+LEGAL STATUS:
+  Legal dispute: {'Yes' if p.has_legal_dispute else 'No'}
+  Legal cases: {p.num_legal_cases}
+  Ownership conflicts: {p.ownership_conflicts}
+  Award overdue: {'Yes' if p.award_overdue else 'No'}
+
+TIMELINE:
+  Days in current stage: {p.days_in_current_stage}
+  Days since last action: {p.days_since_last_action}
+  Days since system update: {p.days_since_update}
+  Pending approvals: {p.pending_approvals}
+  NOC pending: {p.noc_pending_count}
+
+FINANCIAL:
+  Land cost: ₹{p.land_cost_cr} Cr | Amount paid: ₹{p.amount_paid_cr} Cr
+  Project value: ₹{p.project_value_cr} Cr | Budget released: {p.budget_released}
+  Compensation pending: {p.compensation_pending_months} months
+
+CONTEXT:
+  District historical delay rate: {p.district_historical_delay_rate}
+  Officer responsiveness: {p.officer_responsiveness}/10
+  Land area: {p.land_area_ha} ha | Families affected: {p.families_affected}
+
+TOP SHAP RISK DRIVERS:
+{top_shap}
+
+AI RECOMMENDATIONS ALREADY GENERATED:
+{top_recs}
+=== END PROJECT CONTEXT ==="""
+
+
+@router.post("/{project_id}/chat")
+def chat_with_project(
+    project_id: str,
+    body: ChatRequest,
+    request: Request,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+    x_openai_key: Optional[str] = Header(default=None, alias="X-OpenAI-Key"),
+):
+    """
+    Project-aware chat endpoint.
+    - Loads full project data as system context
+    - Accepts message history from frontend (stateless on backend)
+    - Uses GPT-4o-mini; falls back to rule-based reply if no key
+
+    Request body:
+      { message: str, history: [{role, content}, ...] }
+
+    Returns:
+      { reply: str, model_used: str, tokens_used: int }
+    """
+    import os
+    from openai import OpenAI as _OAI
+
+    project = db.query(Project).filter(Project.project_id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # RBAC
+    if current_user.role == UserRole.DISTRICT and (
+        project.district != current_user.district or project.state != current_user.state
+    ):
+        raise HTTPException(status_code=403, detail="Access denied")
+    if current_user.role == UserRole.STATE and project.state != current_user.state:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    resolved_key = (x_openai_key or "").strip() or os.getenv("OPENAI_API_KEY", "").strip()
+
+    # ── Fallback: no API key ──────────────────────────────────────────────────
+    if not resolved_key:
+        rules = project.rules_triggered or []
+        recs  = project.recommendations or []
+        fallback = (
+            f"**{project.project_name}** ({project.project_id}) — "
+            f"Risk: **{project.risk_score}/100** ({project.risk_category.value if project.risk_category else 'N/A'})\n\n"
+        )
+        if rules:
+            fallback += f"**Triggered rules:** {', '.join(rules)}\n\n"
+        if recs:
+            fallback += "**Top recommendations:**\n" + "\n".join(f"{i+1}. {r}" for i, r in enumerate(recs[:3]))
+        fallback += "\n\n*(Set your OpenAI API key above for full conversational AI analysis.)*"
+        return {"reply": fallback, "model_used": "rule-based-fallback", "tokens_used": 0}
+
+    # ── Build messages ────────────────────────────────────────────────────────
+    project_context = _build_chat_system_context(project)
+    system_msg = CHAT_SYSTEM_PROMPT + "\n\n" + project_context
+
+    messages = [{"role": "system", "content": system_msg}]
+
+    # Add conversation history (max last 20 turns to stay within context)
+    for turn in body.history[-20:]:
+        messages.append({"role": turn.role, "content": turn.content})
+
+    # Add current user message
+    messages.append({"role": "user", "content": body.message})
+
+    try:
+        client   = _OAI(api_key=resolved_key)
+        response = client.chat.completions.create(
+            model       = "gpt-4o-mini",
+            messages    = messages,
+            temperature = 0.3,
+            max_tokens  = 500,
+            timeout     = 30,
+        )
+        reply  = response.choices[0].message.content.strip()
+        tokens = response.usage.total_tokens if response.usage else 0
+
+        log_action(db, current_user, "CHAT_PROJECT", "project", project_id,
+                   detail=f"tokens={tokens}",
+                   ip_address=request.client.host if request.client else None)
+
+        return {"reply": reply, "model_used": "gpt-4o-mini", "tokens_used": tokens}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI chat failed: {str(e)}")
